@@ -1,0 +1,30 @@
+{
+  "name": "win-calendar-widget",
+  "version": "1.0.0",
+  "description": "Прозрачный виджет-календарь для рабочего стола Windows 11 с синхронизацией Google Календаря",
+  "main": "src/main.js",
+  "author": "you",
+  "license": "MIT",
+  "scripts": {
+    "icon": "node build/gen-icon.js",
+    "start": "npm run icon && electron .",
+    "dist": "npm run icon && electron-builder --win portable --x64"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "local.win.calendar.widget",
+    "productName": "CalendarWidget",
+    "files": ["src/**/*", "build/icon.png", "package.json"],
+    "directories": { "output": "dist" },
+    "win": {
+      "target": [{ "target": "portable", "arch": ["x64"] }],
+      "icon": "build/icon.png"
+    },
+    "portable": {
+      "artifactName": "CalendarWidget.exe"
+    }
+  }
+}

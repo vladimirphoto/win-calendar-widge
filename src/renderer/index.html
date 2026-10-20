@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; script-src 'self'; img-src 'self' data:">
+<title>Календарь</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<main class="card" id="card">
+  <header id="head">
+    <div class="ttl">
+      <div class="month" id="title"></div>
+      <div class="sub" id="sub"></div>
+    </div>
+    <div class="tools">
+      <button class="chip" id="btnToday">Сегодня</button>
+      <button class="ib" id="btnPrev" title="Предыдущий месяц" aria-label="Предыдущий месяц">
+        <svg viewBox="0 0 16 16"><path d="M10 3 5 8l5 5" /></svg>
+      </button>
+      <button class="ib" id="btnNext" title="Следующий месяц" aria-label="Следующий месяц">
+        <svg viewBox="0 0 16 16"><path d="m6 3 5 5-5 5" /></svg>
+      </button>
+      <button class="ib" id="btnCfg" title="Настройки" aria-label="Настройки">
+        <svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="2.2"/><path d="M8 1.5v1.6M8 12.9v1.6M1.5 8h1.6M12.9 8h1.6M3.4 3.4l1.1 1.1M11.5 11.5l1.1 1.1M3.4 12.6l1.1-1.1M11.5 4.5l1.1-1.1"/></svg>
+      </button>
+      <button class="ib" id="btnHide" title="Скрыть в трей" aria-label="Скрыть в трей">
+        <svg viewBox="0 0 16 16"><path d="m4 4 8 8M12 4l-8 8"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <div class="dows" id="dows"></div>
+  <div class="days" id="days"></div>
+
+  <section class="agenda">
+    <h3 id="agTitle"></h3>
+    <div class="list" id="agList"></div>
+  </section>
+
+  <footer>
+    <div class="status" id="status"><i></i><span id="statusText">Не подключено</span></div>
+    <button class="chip" id="btnSync">Войти в Google</button>
+  </footer>
+
+  <!-- Настройки -->
+  <section class="panel" id="panel" hidden>
+    <div class="panel-head">
+      <h2>Настройки</h2>
+      <button class="chip primary" id="btnDone">Готово</button>
+    </div>
+
+    <div class="field">
+      <label for="fKeys">Что считать сменой (слова в названии)</label>
+      <input id="fKeys" type="text" placeholder="пусто = все события" spellcheck="false">
+      <p class="hint">Пусто: сменой считается каждое событие, цвет берётся из метки в Google Календаре (цвет студии). Если в календаре есть и личные события, впишите слова из названий смен через запятую.</p>
+    </div>
+
+    <div class="field">
+      <label for="fOpacity">Прозрачность</label>
+      <input id="fOpacity" type="range" min="40" max="100" step="2">
+    </div>
+
+    <div class="toggle"><span>Запускать при старте Windows</span><label class="sw"><input type="checkbox" id="tAuto"><b></b></label></div>
+    <div class="toggle"><span>Поверх всех окон</span><label class="sw"><input type="checkbox" id="tTop"><b></b></label></div>
+    <div class="toggle"><span>Закрепить положение</span><label class="sw"><input type="checkbox" id="tLock"><b></b></label></div>
+    <p class="hint" id="devNote" hidden>Автозапуск работает только в установленной версии (после npm run dist).</p>
+
+    <h3 class="sect">Google Календарь</h3>
+    <div class="field">
+      <label for="fClient">Client ID</label>
+      <input id="fClient" type="text" placeholder="xxxx.apps.googleusercontent.com" spellcheck="false" autocomplete="off">
+    </div>
+    <div class="field">
+      <label for="fSecret">Client secret</label>
+      <input id="fSecret" type="password" placeholder="GOCSPX-…" spellcheck="false" autocomplete="off">
+    </div>
+    <div class="row">
+      <button class="chip primary" id="btnSaveG">Сохранить и войти</button>
+      <button class="chip" id="btnLogout">Выйти</button>
+    </div>
+    <p class="hint">Данные нужны один раз. Пошаговая инструкция, как получить Client ID, есть в README.</p>
+    <p class="err" id="cfgErr" hidden></p>
+  </section>
+</main>
+<script src="renderer.js"></script>
+</body>
+</html>
