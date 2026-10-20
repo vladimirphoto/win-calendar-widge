@@ -5,6 +5,9 @@ on:
   push:
     branches: [main]
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: windows-latest
@@ -19,3 +22,8 @@ jobs:
         with:
           name: CalendarWidget
           path: dist/CalendarWidget.exe
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: CalendarWidget (latest)
+          files: dist/CalendarWidget.exe
