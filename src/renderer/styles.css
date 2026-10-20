@@ -3,6 +3,7 @@
   --accent: #0067c0;
   --on-accent: #fff;
   --bg: rgba(243, 243, 243, var(--alpha));
+  --panel-bg: rgba(243, 243, 243, .97);
   --layer: rgba(255, 255, 255, .7);
   --text: #1b1b1b;
   --muted: #5f5f5f;
@@ -17,6 +18,7 @@
 @media (prefers-color-scheme: dark) {
   :root {
     --bg: rgba(32, 32, 32, var(--alpha));
+    --panel-bg: rgba(32, 32, 32, .97);
     --layer: rgba(255, 255, 255, .055);
     --text: #f5f5f5;
     --muted: #b0b0b0;
@@ -127,7 +129,7 @@ footer > .chip { justify-self: end; }
 /* настройки */
 .panel {
   position: absolute; inset: 0; padding: 14px 16px; overflow-y: auto;
-  background: var(--bg); backdrop-filter: blur(0); z-index: 5;
+  background: var(--panel-bg); z-index: 5;
 }
 .panel[hidden] { display: none; }
 body.panel-open .card { height: 100%; }

@@ -125,6 +125,7 @@ function updateButtons() {
   $('btnLogout').disabled = !loggedIn;
 }
 
+const colorOrder = [];
 function render() {
   $('title').innerHTML = `${esc(view.toLocaleDateString('ru', { month: 'long' }))}<small>${view.getFullYear()}</small>`;
   $('dows').innerHTML = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'].map(n => `<div class="dow">${n}</div>`).join('');
@@ -143,9 +144,11 @@ function render() {
     if (k === selK) cls.push('sel');
     // цвета студий (смен) за день без повторов
     const sc = [...new Set(evs.filter(e => e.shift).map(e => e.color || '#0f7b6c'))].slice(0, 3);
-    const others = evs.filter(e => !e.shift).slice(0, 3);
-    const dots = sc.map(c => `<span class="dot s" data-c="${esc(c)}"></span>`).join('') +
-      others.map(e => `<span class="dot"${e.color ? ` data-c="${esc(e.color)}"` : ''}></span>`).join('');
+    // по точке на каждую студию (цвет) за день, в одном и том же порядке во всех днях
+    const dcs = [...new Set(evs.map(e => e.color || ''))];
+    dcs.forEach(c => { if (!colorOrder.includes(c)) colorOrder.push(c); });
+    dcs.sort((x, y) => colorOrder.indexOf(x) - colorOrder.indexOf(y));
+    const dots = dcs.slice(0, 6).map(c => `<span class="dot"${c ? ` data-c="${esc(c)}"` : ''}></span>`).join('');
     html += `<div class="${cls.join(' ')}" data-k="${k}"${sc.length ? ` data-sc="${esc(sc.join(','))}"` : ''}>${d.getDate()}<div class="dots">${dots}</div></div>`;
   }
   const grid = $('days');
