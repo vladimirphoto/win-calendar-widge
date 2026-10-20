@@ -34,6 +34,12 @@ function isShift(title) {
   return keys.some(k => t.includes(k));
 }
 
+function visibleEvents(key) {
+  const list = events[key] || [];
+  const hasKeys = (settings?.keywords || '').trim() !== '';
+  return settings?.onlyMine && hasKeys ? list.filter(e => e.shift) : list;
+}
+
 /* ---------- данные ---------- */
 function indexEvents(list) {
   const map = {};
@@ -129,7 +135,7 @@ function render() {
   let html = '';
   for (let i = 0; i < 42; i++) {
     const d = new Date(start); d.setDate(start.getDate() + i);
-    const k = ymd(d), evs = events[k] || [];
+    const k = ymd(d), evs = visibleEvents(k);
     const cls = ['day'];
     if (d.getMonth() !== view.getMonth()) cls.push('other');
     if (evs.some(e => e.shift)) cls.push('shift');
@@ -173,7 +179,7 @@ function render() {
 
 function renderAgenda() {
   $('agTitle').textContent = sel.toLocaleDateString('ru', { weekday: 'long', day: 'numeric', month: 'long' });
-  const evs = events[ymd(sel)] || [];
+  const evs = visibleEvents(ymd(sel));
   const list = $('agList');
   if (!evs.length) { list.innerHTML = '<div class="empty">Нет событий</div>'; return; }
   list.innerHTML = evs.map((e, i) => {
@@ -208,6 +214,7 @@ function applySettings(s) {
   $('tAuto').checked = !!s.autostart;
   $('tTop').checked = !!s.alwaysOnTop;
   $('tLock').checked = !!s.locked;
+  $('tOnly').checked = !!s.onlyMine;
   $('devNote').hidden = !!s.packaged;
   if (document.activeElement !== $('fClient')) $('fClient').value = s.clientId || '';
   $('fSecret').placeholder = s.hasSecret ? '•••••••• (сохранён)' : 'GOCSPX-…';
@@ -249,6 +256,7 @@ let keysTimer;
 $('fKeys').addEventListener('input', () => { clearTimeout(keysTimer); keysTimer = setTimeout(() => api.setSettings({ keywords: $('fKeys').value }), 300); });
 $('fOpacity').addEventListener('input', () => api.setSettings({ opacity: Number($('fOpacity').value) / 100 }));
 $('tAuto').onchange = () => api.setSettings({ autostart: $('tAuto').checked });
+$('tOnly').onchange = () => api.setSettings({ onlyMine: $('tOnly').checked });
 $('tTop').onchange = () => api.setSettings({ alwaysOnTop: $('tTop').checked });
 $('tLock').onchange = () => api.setSettings({ locked: $('tLock').checked });
 

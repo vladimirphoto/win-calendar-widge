@@ -53,7 +53,7 @@
     <div class="field">
       <label for="fKeys">Что считать сменой (слова в названии)</label>
       <input id="fKeys" type="text" placeholder="пусто = все события" spellcheck="false">
-      <p class="hint">Пусто: сменой считается каждое событие, цвет берётся из метки в Google Календаре (цвет студии). Если в календаре есть и личные события, впишите слова из названий смен через запятую.</p>
+      <p class="hint">Пусто: сменой считается каждое событие, цвет берётся из метки в Google Календаре (цвет студии). Если в календаре есть и личные события, впишите слова из названий смен через запятую (например, своё имя). Чтобы скрыть всё остальное, включите «Показывать только мои смены».</p>
     </div>
 
     <div class="field">
@@ -62,6 +62,7 @@
     </div>
 
     <div class="toggle"><span>Запускать при старте Windows</span><label class="sw"><input type="checkbox" id="tAuto"><b></b></label></div>
+    <div class="toggle"><span>Показывать только мои смены (по словам выше)</span><label class="sw"><input type="checkbox" id="tOnly"><b></b></label></div>
     <div class="toggle"><span>Поверх всех окон</span><label class="sw"><input type="checkbox" id="tTop"><b></b></label></div>
     <div class="toggle"><span>Закрепить положение</span><label class="sw"><input type="checkbox" id="tLock"><b></b></label></div>
     <p class="hint" id="devNote" hidden>Автозапуск работает только в установленной версии (после npm run dist).</p>

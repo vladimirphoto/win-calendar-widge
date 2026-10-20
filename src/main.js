@@ -18,6 +18,7 @@ const DEFAULTS = {
   autostart: true,
   alwaysOnTop: false,
   locked: false,
+  onlyMine: false, // true = показывать только события, подходящие под ключевые слова
   opacity: 0.92,
   bounds: null
 };
@@ -312,7 +313,7 @@ function updateSettings(patch) {
     if (v !== next.clientSecret) authReset = true;
     next.clientSecret = v;
   }
-  for (const k of ['autostart', 'alwaysOnTop', 'locked']) {
+  for (const k of ['autostart', 'alwaysOnTop', 'locked', 'onlyMine']) {
     if (typeof patch[k] === 'boolean') next[k] = patch[k];
   }
   if (typeof patch.opacity === 'number' && isFinite(patch.opacity)) {
