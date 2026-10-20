@@ -10,6 +10,7 @@ const crypto = require('crypto');
 const SCOPE = 'https://www.googleapis.com/auth/calendar.readonly';
 const WIN_W = 420;
 const WIN_H = 660;
+const WIN_MIN_H = 360;
 
 const DEFAULTS = {
   keywords: '', // пусто = все события календаря считаются сменами и красятся цветом студии
@@ -399,6 +400,15 @@ function registerIpc() {
   });
   ipcMain.handle('sys:accent', () => accentHex());
   ipcMain.on('window:hide', () => win?.hide());
+  ipcMain.on('window:fit', (_e, h) => {
+    if (!win || win.isDestroyed() || typeof h !== 'number' || !isFinite(h)) return;
+    const height = Math.round(Math.min(WIN_H, Math.max(WIN_MIN_H, h)));
+    const b = win.getBounds();
+    if (b.height === height) return;
+    const wa = screen.getDisplayMatching(b).workArea;
+    const y = Math.max(wa.y, Math.min(b.y, wa.y + wa.height - height));
+    win.setBounds({ x: b.x, y, width: WIN_W, height });
+  });
 }
 
 /* ---------- запуск ---------- */

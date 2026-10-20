@@ -15,6 +15,7 @@ contextBridge.exposeInMainWorld('widget', {
   getEvents: range => ipcRenderer.invoke('events:get', range),
   getAccent: () => ipcRenderer.invoke('sys:accent'),
   hide: () => ipcRenderer.send('window:hide'),
+  fit: h => ipcRenderer.send('window:fit', h),
   onAccent: cb => on('sys:accent', cb),
   onRefresh: cb => on('app:refresh', cb),
   onLogin: cb => on('app:login', cb),

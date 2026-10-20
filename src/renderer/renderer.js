@@ -175,6 +175,8 @@ function render() {
   }
   $('sub').textContent = n ? `${n} ${plural(n, 'смена', 'смены', 'смен')} в этом месяце${demo ? ' (пример)' : ''}` : '';
   renderAgenda();
+  renderSeg();
+  fitWindow();
 }
 
 function renderAgenda() {
@@ -226,8 +228,28 @@ function applySettings(s) {
   render();
 }
 
-function openPanel() { $('panel').hidden = false; }
-function closePanel() { $('panel').hidden = true; hideCfgErr(); }
+function openPanel() { $('panel').hidden = false; document.body.classList.add('panel-open'); api.fit(10000); }
+function closePanel() { $('panel').hidden = true; document.body.classList.remove('panel-open'); hideCfgErr(); fitWindow(); }
+
+function renderSeg() {
+  const mine = !!settings?.onlyMine;
+  $('segMine').classList.toggle('on', mine);
+  $('segAll').classList.toggle('on', !mine);
+  $('segMine').setAttribute('aria-pressed', String(mine));
+  $('segAll').setAttribute('aria-pressed', String(!mine));
+}
+
+// окно подгоняется под содержимое, чтобы не оставалось пустого места
+let fitRaf = 0;
+function fitWindow() {
+  cancelAnimationFrame(fitRaf);
+  fitRaf = requestAnimationFrame(() => {
+    if (!$('panel').hidden) return;
+    const list = $('agList');
+    const natural = $('card').offsetHeight - list.clientHeight + list.scrollHeight;
+    api.fit(natural + 32); // 32 = внешние отступы body
+  });
+}
 function showCfgErr(m) { const el = $('cfgErr'); el.textContent = m; el.hidden = false; }
 function hideCfgErr() { $('cfgErr').hidden = true; }
 
@@ -256,6 +278,11 @@ let keysTimer;
 $('fKeys').addEventListener('input', () => { clearTimeout(keysTimer); keysTimer = setTimeout(() => api.setSettings({ keywords: $('fKeys').value }), 300); });
 $('fOpacity').addEventListener('input', () => api.setSettings({ opacity: Number($('fOpacity').value) / 100 }));
 $('tAuto').onchange = () => api.setSettings({ autostart: $('tAuto').checked });
+$('segAll').onclick = () => api.setSettings({ onlyMine: false });
+$('segMine').onclick = () => {
+  if (!(settings?.keywords || '').trim()) { openPanel(); $('fKeys').focus(); return; }
+  api.setSettings({ onlyMine: true });
+};
 $('tOnly').onchange = () => api.setSettings({ onlyMine: $('tOnly').checked });
 $('tTop').onchange = () => api.setSettings({ alwaysOnTop: $('tTop').checked });
 $('tLock').onchange = () => api.setSettings({ locked: $('tLock').checked });
