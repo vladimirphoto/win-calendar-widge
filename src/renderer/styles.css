@@ -272,7 +272,7 @@ input[type=time]::-webkit-calendar-picker-indicator { filter: invert(.6); cursor
 /* размытые обои, выровненные с экраном (см. layoutGlass) */
 :root[data-theme="glass"] .glassbg { display: block; position: absolute; inset: 0; z-index: -1; overflow: hidden; border-radius: inherit; pointer-events: none; }
 :root[data-theme="glass"] .glassbg[hidden] { display: none; }
-.gw { position: absolute; inset: -60px; background-repeat: no-repeat; filter: blur(var(--glass-blur, 20px)) saturate(1.9) brightness(.98); }
+.gw { position: absolute; inset: -60px; background-repeat: no-repeat; filter: blur(var(--glass-blur, 20px)) saturate(var(--glass-sat, 1.8)) brightness(.98); }
 /* зеркальный ободок: яркий сверху-слева и снизу-справа, прозрачный по бокам */
 :root[data-theme="glass"] .card::after {
   content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1.2px; pointer-events: none; z-index: 6;

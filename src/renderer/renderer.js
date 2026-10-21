@@ -315,7 +315,10 @@ setInterval(() => { if (effectiveTheme(settings) === 'glass' && !document.hidden
 function applySettings(s) {
   settings = s;
   applyTheme(s);
-  document.documentElement.style.setProperty('--glass-blur', (s.glassBlur ?? 20) + 'px');
+  const gb = s.glassBlur ?? 20;
+  document.documentElement.style.setProperty('--glass-blur', gb + 'px');
+  // чем резче стекло, тем ближе цвета к настоящим обоям; насыщенность растёт вместе с размытием
+  document.documentElement.style.setProperty('--glass-sat', String(+(1 + 0.8 * Math.min(1, gb / 20)).toFixed(2)));
   if (document.activeElement !== $('fBlur')) $('fBlur').value = s.glassBlur ?? 20;
   if (!payTimer) dayPay = { ...(s.dayPay || {}) }; // пока человек вводит сумму, локальные значения главнее
   document.documentElement.style.setProperty('--alpha', String(s.opacity));

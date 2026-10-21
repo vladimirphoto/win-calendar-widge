@@ -577,11 +577,11 @@ async function readWallpaper() {
         const img = nativeImage.createFromBuffer(fs.readFileSync(f));
         if (img.isEmpty()) continue;
         const sz = img.getSize();
-        // размытию детали не нужны: уменьшаем до 640 px по ширине (дёшево по памяти)
-        const small = sz.width > 640 ? img.resize({ width: 640, quality: 'good' }) : img;
+        // до 1920 px по ширине: при малом размытии обои видны почти чёткими, 640 px давали «лесенку» (дальше уменьшать нет смысла, память)
+        const small = sz.width > 1920 ? img.resize({ width: 1920, quality: 'best' }) : img;
         const s2 = small.getSize();
         value = {
-          url: 'data:image/jpeg;base64,' + small.toJPEG(70).toString('base64'), w: s2.width, h: s2.height,
+          url: 'data:image/jpeg;base64,' + small.toJPEG(86).toString('base64'), w: s2.width, h: s2.height,
           style: tile === '1' ? 'tile' : ({ '10': 'fill', '22': 'fill', '6': 'fit', '2': 'stretch', '0': 'center' }[style] || 'fill')
         };
         break;
