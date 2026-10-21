@@ -18,7 +18,7 @@ const APP_TITLE = 'Календарь';
 const SCOPE = 'https://www.googleapis.com/auth/calendar.readonly';
 const WIN_W = 420;
 const WIN_H = 660;
-const WIN_MIN_H = 360;
+const WIN_MIN_H = 300;
 const CACHE_RANGES = 8;          // сколько периодов держать в офлайн-кэше
 const NOTIFY_HORIZON = 7 * 24 * 3600 * 1000;
 
@@ -30,6 +30,7 @@ const DEFAULTS = {
   locked: false,
   onlyMine: false, // true = показывать только события, подходящие под ключевые слова
   opacity: 0.92,
+  scale: 1,        // размер виджета: 0.8 … 1.6
   autoUpdate: true, // сам скачивать и ставить новые версии
   lastUpdateTry: 0, // когда последний раз пробовали автоустановку (защита от зацикливания)
   notify: true,    // уведомление Windows перед сменой
@@ -483,7 +484,7 @@ function createWindow() {
   }
 
   win = new BrowserWindow({
-    width: WIN_W, height: WIN_H, x, y,
+    width: Math.round(WIN_W * (settings.scale || 1)), height: Math.round(WIN_H * (settings.scale || 1)), x, y,
     frame: false,
     transparent: true,
     backgroundColor: '#00000000',
@@ -505,6 +506,7 @@ function createWindow() {
   });
 
   win.loadFile(path.join(__dirname, 'renderer', 'index.html'));
+  win.webContents.on('did-finish-load', applyScale);
   win.once('ready-to-show', () => win.show());
 
   let moveTimer;
@@ -542,6 +544,17 @@ function applyAutostart() {
     app.setLoginItemSettings({ openAtLogin: !!settings.autostart, path: exe });
   } catch (e) { console.error('autostart failed', e); }
 }
+// масштаб: увеличиваем содержимое окна и само окно (ширина), высоту потом подгоняет интерфейс через window:fit
+function applyScale() {
+  if (!win || win.isDestroyed()) return;
+  const f = settings.scale || 1;
+  win.webContents.setZoomFactor(f);
+  const b = win.getBounds(), width = Math.round(WIN_W * f);
+  if (b.width !== width) {
+    const wa = screen.getDisplayMatching(b).workArea;
+    win.setBounds({ x: Math.max(wa.x, Math.min(b.x, wa.x + wa.width - width)), y: b.y, width, height: b.height });
+  }
+}
 function applyWindowBehavior() {
   if (!win) return;
   win.setAlwaysOnTop(!!settings.alwaysOnTop);
@@ -552,6 +565,9 @@ function updateSettings(patch) {
   if (typeof patch.keywords === 'string') next.keywords = patch.keywords.slice(0, 200);
   for (const k of ['autostart', 'alwaysOnTop', 'locked', 'onlyMine', 'notify', 'autoUpdate']) {
     if (typeof patch[k] === 'boolean') next[k] = patch[k];
+  }
+  if (typeof patch.scale === 'number' && isFinite(patch.scale)) {
+    next.scale = Math.round(Math.min(1.6, Math.max(0.8, patch.scale)) * 20) / 20;
   }
   if (typeof patch.opacity === 'number' && isFinite(patch.opacity)) {
     next.opacity = Math.min(1, Math.max(0.4, patch.opacity));
@@ -581,6 +597,7 @@ function updateSettings(patch) {
   saveSettings();
   applyAutostart();
   applyWindowBehavior();
+  applyScale();
   rescheduleNotifications();
   refreshTray();
   send('settings:changed', publicSettings());
@@ -684,12 +701,16 @@ function registerIpc() {
   ipcMain.on('window:hide', () => win?.hide());
   ipcMain.on('window:fit', (_e, h) => {
     if (!win || win.isDestroyed() || typeof h !== 'number' || !isFinite(h)) return;
-    const height = Math.round(Math.min(WIN_H, Math.max(WIN_MIN_H, h)));
+    const f = settings.scale || 1;
     const b = win.getBounds();
-    if (b.height === height) return;
     const wa = screen.getDisplayMatching(b).workArea;
+    // высота содержимого приходит в «обычных» пикселях, умножаем на масштаб; выше экрана окно не растёт
+    const height = Math.round(Math.min(WIN_H * f, wa.height, Math.max(WIN_MIN_H * f, h * f)));
+    const width = Math.round(WIN_W * f);
+    if (b.height === height && b.width === width) return;
     const y = Math.max(wa.y, Math.min(b.y, wa.y + wa.height - height));
-    win.setBounds({ x: b.x, y, width: WIN_W, height });
+    const x = Math.max(wa.x, Math.min(b.x, wa.x + wa.width - width));
+    win.setBounds({ x, y, width, height });
   });
 }
 

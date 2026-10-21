@@ -91,6 +91,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 .dot.s { background: var(--shift); }
 
 /* повестка дня */
+.agenda[hidden] { display: none; }
 .agenda { flex: 0 1 auto; min-height: 0; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); display: flex; flex-direction: column; }
 .agh { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
 .agenda h3 { font-size: 13px; font-weight: 600; text-transform: capitalize; }

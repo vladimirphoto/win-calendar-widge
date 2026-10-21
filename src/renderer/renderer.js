@@ -14,6 +14,7 @@ let lastSync = null;
 let offline = false;
 let upcoming = [];        // события от сегодняшнего дня (не зависят от того, какой месяц листают)
 let lastKeys = null;
+let lastScale = null;
 let lastActivity = Date.now();
 const IDLE_RETURN_MS = 2 * 60 * 1000; // через 2 минуты без действий вернуться на сегодня
 
@@ -40,10 +41,11 @@ function plural(n, one, few, many) {
 }
 
 const hasAnyNames = () => (settings?.keywords || '').trim() !== '';
+const isClean = () => !hasAnyNames(); // «чистый календарь»: ни смен, ни списка дня
 function isShift(title) {
   const keys = (settings?.keywords || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
-  // имя не заполнено: чистый календарь без отметок смен (кроме примеров до входа в Google)
-  if (!keys.length) return demo;
+  // имя не заполнено: чистый календарь без отметок смен
+  if (!keys.length) return false;
   const t = String(title).toLowerCase();
   return keys.some(k => t.includes(k));
 }
@@ -79,20 +81,8 @@ function indexEvents(list) {
   return map;
 }
 
-function demoEvents() {
-  const t = new Date();
-  const list = [];
-  const studios = ['#0b8043', '#8e24aa', '#f4511e'];
-  [0, 1, 4, 5, 8, 9, 12, 13, 16, 17, 20, 21].forEach((n, i) => {
-    const s = new Date(t.getFullYear(), t.getMonth(), t.getDate() + n, 9);
-    const e = new Date(s); e.setHours(21);
-    list.push({ id: 'd' + n, title: 'Студия ' + (Math.floor(i / 2) % 3 + 1) + ' (пример)', allDay: false, start: s.toISOString(), end: e.toISOString(), color: studios[Math.floor(i / 2) % 3], calendar: 'Демо' });
-  });
-  const s = new Date(t.getFullYear(), t.getMonth(), t.getDate() + 2, 18);
-  const e = new Date(s); e.setHours(19, 30);
-  list.push({ id: 'dx', title: 'Встреча (пример)', allDay: false, start: s.toISOString(), end: e.toISOString(), color: '#8764b8', calendar: 'Демо' });
-  return list;
-}
+// примеров нет: пока вы не вошли в Google, календарь пустой и чистый
+function demoEvents() { return []; }
 
 async function sync() {
   if (!loggedIn) return;
@@ -164,7 +154,7 @@ function render() {
   const first = new Date(view.getFullYear(), view.getMonth(), 1);
   const start = new Date(first); start.setDate(1 - ((first.getDay() + 6) % 7));
   const todayK = ymd(new Date()), selK = ymd(sel);
-  const clean = !demo && !hasAnyNames(); // имя не заполнено: никаких отметок смен и точек
+  const clean = isClean(); // имя не заполнено: никаких отметок смен и точек
   let html = '';
   for (let i = 0; i < 42; i++) {
     const d = new Date(start); d.setDate(start.getDate() + i);
@@ -198,7 +188,6 @@ function render() {
   // счётчик смен в отображаемом месяце
   const n = monthShifts().length;
   let sub = n ? `${n} ${plural(n, 'смена', 'смены', 'смен')}` : '';
-  if (n && demo) sub += ' (пример)';
   $('sub').textContent = sub;
   updateEarn();
   renderAgenda();
@@ -234,6 +223,9 @@ function updateEarn() {
 }
 
 function renderAgenda() {
+  const sec = document.querySelector('.agenda');
+  sec.hidden = isClean();
+  if (isClean()) { agEvs = []; return; }
   $('agTitle').textContent = sel.toLocaleDateString('ru', { weekday: 'long', day: 'numeric', month: 'long' });
   const evs = visibleEvents(ymd(sel));
   const list = $('agList');
@@ -271,6 +263,10 @@ function applySettings(s) {
   document.body.classList.toggle('locked', !!s.locked);
   $('fKeys').value = s.keywords;
   $('fOpacity').value = Math.round(s.opacity * 100);
+  const sc = Math.round((s.scale || 1) * 100);
+  if (document.activeElement !== $('fScale')) { $('fScale').value = sc; $('scaleVal').textContent = sc + '%'; }
+  if (lastScale !== null && lastScale !== sc && !$('panel').hidden) api.fit(10000); // размер сменился: настройки снова на всю высоту
+  lastScale = sc;
   $('tAuto').checked = !!s.autostart;
   $('tTop').checked = !!s.alwaysOnTop;
   $('tLock').checked = !!s.locked;
@@ -483,6 +479,9 @@ document.addEventListener('keydown', e => {
 
 let keysTimer;
 $('fKeys').addEventListener('input', () => { clearTimeout(keysTimer); keysTimer = setTimeout(() => api.setSettings({ keywords: $('fKeys').value }), 300); });
+// размер применяем, когда отпустили ползунок (во время перетаскивания окно не дёргается под курсором)
+$('fScale').addEventListener('input', () => { $('scaleVal').textContent = $('fScale').value + '%'; });
+$('fScale').addEventListener('change', () => api.setSettings({ scale: Number($('fScale').value) / 100 }));
 $('fOpacity').addEventListener('input', () => api.setSettings({ opacity: Number($('fOpacity').value) / 100 }));
 $('tAuto').onchange = () => api.setSettings({ autostart: $('tAuto').checked });
 $('segAll').onclick = () => api.setSettings({ onlyMine: false });
@@ -569,7 +568,7 @@ api.onAuthChanged(v => { loggedIn = v; if (!v) { demo = true; upcoming = []; eve
   render();
   api.updateState().then(s => { upd = s; renderUpdate(); });
   if (loggedIn) { await sync(); }
-  else setStatus('', 'Показаны примеры — войдите в Google');
+  else setStatus('', 'Не подключено');
   // автообновление данных раз в 10 минут
   setInterval(() => { if (loggedIn) sync(); }, 10 * 60 * 1000);
   // раз в минуту: смена даты после полуночи, «Следующая смена», возврат на сегодня после бездействия
