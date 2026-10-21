@@ -118,12 +118,15 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 .empty { color: var(--muted); font-size: 13px; padding: 2px; }
 
 /* подвал */
-footer { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 8px; align-items: center; margin-top: 8px; font-size: 12px; color: var(--muted); }
+footer { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 8px; align-items: end; margin-top: 8px; font-size: 12px; color: var(--muted); }
 .status { display: flex; align-items: center; gap: 6px; min-width: 0; white-space: nowrap; }
 .status span { overflow: hidden; text-overflow: ellipsis; }
 .status i { flex: none; }
-footer > .chip { white-space: nowrap; }
-footer > .chip { justify-self: end; }
+footer > .status, footer > .seg { margin-bottom: 2px; }
+.fr { justify-self: end; display: flex; flex-direction: column; align-items: flex-end; gap: 3px; min-width: 0; }
+.fr .chip { white-space: nowrap; }
+.earn { font-size: 12.5px; font-weight: 600; color: var(--shift); white-space: nowrap; font-variant-numeric: tabular-nums; padding-right: 10px; }
+.earn[hidden] { display: none; }
 .seg { display: flex; padding: 2px; gap: 2px; border-radius: 8px; background: var(--layer); border: 1px solid var(--line); }
 .seg button { font-size: 12px; padding: 4px 12px; border-radius: 6px; color: var(--muted); transition: background .12s, color .12s; }
 .seg button:hover { background: var(--hover); color: var(--text); }
@@ -177,3 +180,13 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
 .rate .nm span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .rate input[type=number] { width: 110px; flex: none; text-align: right; }
 .rate .cur { color: var(--muted); font-size: 13px; width: 14px; }
+
+/* удаление данных */
+.chip.danger { color: #d13438; border-color: color-mix(in srgb, #d13438 45%, transparent); }
+.chip.danger:hover { background: color-mix(in srgb, #d13438 12%, transparent); }
+.chip.danger.solid { background: #d13438; color: #fff; border-color: #d13438; }
+.chip.danger.solid:hover { filter: brightness(1.1); background: #d13438; }
+.confirm { margin-top: 10px; padding: 10px 12px; border: 1px solid color-mix(in srgb, #d13438 45%, transparent); border-radius: 8px; background: color-mix(in srgb, #d13438 8%, transparent); }
+.confirm p { font-size: 12.5px; line-height: 1.4; }
+.confirm[hidden] { display: none; }
+.toggle[hidden] { display: none; }

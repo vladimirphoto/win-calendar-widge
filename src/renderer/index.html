@@ -46,7 +46,7 @@
       <button id="segMine" type="button">Мои</button>
       <button id="segAll" type="button">Все</button>
     </div>
-    <button class="chip" id="btnSync">Войти в Google</button>
+    <div class="fr"><div class="earn" id="earn" hidden></div><button class="chip" id="btnSync">Войти в Google</button></div>
   </footer>
 
   <!-- Настройки -->
@@ -93,6 +93,15 @@
     </div>
     <p class="hint" id="authHint"></p>
     <p class="err" id="cfgErr" hidden></p>
+
+    <h3 class="sect">Данные приложения</h3>
+    <p class="hint">Перед удалением приложения: стирает настройки, ставки, кэш и вход в Google с диска, отзывает доступ в вашем аккаунте Google и убирает автозапуск. После этого виджет закроется.</p>
+    <div class="row"><button class="chip danger" id="btnWipe">Удалить все данные…</button></div>
+    <div class="confirm" id="wipeBox" hidden>
+      <p>Это нельзя отменить. Виджет закроется и ничего после себя не оставит.</p>
+      <div class="toggle" id="wipeExeRow"><span>Удалить и сам файл CalendarWidget.exe</span><label class="sw"><input type="checkbox" id="tWipeExe" checked><b></b></label></div>
+      <div class="row"><button class="chip danger solid" id="btnWipeYes">Да, удалить всё</button><button class="chip" id="btnWipeNo">Отмена</button></div>
+    </div>
   </section>
 </main>
 <script src="renderer.js"></script>

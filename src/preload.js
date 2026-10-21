@@ -14,6 +14,7 @@ contextBridge.exposeInMainWorld('widget', {
   logout: () => ipcRenderer.invoke('auth:logout'),
   getEvents: range => ipcRenderer.invoke('events:get', range),
   getAccent: () => ipcRenderer.invoke('sys:accent'),
+  wipe: opts => ipcRenderer.invoke('app:wipe', opts),
   setShifts: list => ipcRenderer.send('notify:shifts', list),
   hide: () => ipcRenderer.send('window:hide'),
   fit: h => ipcRenderer.send('window:fit', h),

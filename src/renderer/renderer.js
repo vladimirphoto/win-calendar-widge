@@ -201,9 +201,13 @@ function render() {
     }
   }
   let sub = n ? `${n} ${plural(n, 'смена', 'смены', 'смен')}` : '';
-  if (n && earn > 0) sub += ` · ${money(earn)}`;
   if (n && demo) sub += ' (пример)';
   $('sub').textContent = sub;
+  // заработок: над кнопкой «Обновить»
+  const earnEl = $('earn');
+  const showEarn = n > 0 && earn > 0;
+  if (showEarn) earnEl.textContent = 'Заработок: ' + money(earn);
+  if (earnEl.hidden === showEarn) earnEl.hidden = !showEarn;
   renderAgenda();
   renderSeg();
   fitWindow();
@@ -429,6 +433,13 @@ $('tOnly').onchange = () => api.setSettings({ onlyMine: $('tOnly').checked });
 $('tTop').onchange = () => api.setSettings({ alwaysOnTop: $('tTop').checked });
 $('tLock').onchange = () => api.setSettings({ locked: $('tLock').checked });
 
+$('btnWipe').onclick = () => { $('wipeExeRow').hidden = !settings?.canDeleteExe; $('wipeBox').hidden = false; $('btnWipe').hidden = true; $('wipeBox').scrollIntoView({ block: 'nearest' }); };
+$('btnWipeNo').onclick = () => { $('wipeBox').hidden = true; $('btnWipe').hidden = false; };
+$('btnWipeYes').onclick = async () => {
+  $('btnWipeYes').disabled = true;
+  const r = await api.wipe({ deleteExe: !!settings?.canDeleteExe && $('tWipeExe').checked });
+  if (!r.ok) { $('btnWipeYes').disabled = false; showCfgErr(r.message || 'Не удалось удалить данные'); }
+};
 $('tNotify').onchange = () => api.setSettings({ notify: $('tNotify').checked });
 let notifyTimer;
 $('fNotifyH').addEventListener('input', () => {

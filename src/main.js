@@ -6,6 +6,8 @@ const path = require('path');
 const fs = require('fs');
 const http = require('http');
 const crypto = require('crypto');
+const os = require('os');
+const { spawn } = require('child_process');
 const EMBEDDED = require('./google-client');
 
 const APP_ID = 'local.win.calendar.widget';
@@ -88,7 +90,7 @@ function saveSettings() {
 }
 function publicSettings() {
   const { clientId, ...rest } = settings;
-  return { ...rest, customClient: !!clientId, packaged: app.isPackaged };
+  return { ...rest, customClient: !!clientId, packaged: app.isPackaged, canDeleteExe: !!process.env.PORTABLE_EXECUTABLE_FILE };
 }
 // какой OAuth-клиент использовать: свой из старых настроек, иначе вшитый
 function creds() {
@@ -346,6 +348,58 @@ function fireNotification(ev, key) {
   n.show();
 }
 
+/* ---------- полное удаление данных ---------- */
+const batEsc = p => p.replace(/%/g, '%%');
+// Скрипт ждёт, пока приложение закроется (на Windows открытые файлы не удалить), и повторяет удаление до 15 раз
+function buildWipeScript(dataDir, exePath) {
+  const L = ['@echo off', 'chcp 65001 >nul', 'set n=0', ':retry', 'ping -n 2 127.0.0.1 >nul'];
+  L.push(`if exist "${batEsc(dataDir)}" rmdir /s /q "${batEsc(dataDir)}" 2>nul`);
+  if (exePath) L.push(`if exist "${batEsc(exePath)}" del /f /q "${batEsc(exePath)}" 2>nul`);
+  const cond = [`exist "${batEsc(dataDir)}"`].concat(exePath ? [`exist "${batEsc(exePath)}"`] : []);
+  L.push('set /a n+=1', 'if %n% GEQ 15 goto done');
+  for (const c of cond) L.push(`if ${c} goto retry`);
+  L.push(':done', '(goto) 2>nul & del "%~f0"');
+  return L.join('\r\n') + '\r\n';
+}
+
+async function wipeEverything(deleteExe) {
+  const dataDir = app.getPath('userData');
+  // защита: удаляем только папку самого виджета
+  if (!/calendar/i.test(path.basename(dataDir)) || dataDir.length < 12 || /["\r\n]/.test(dataDir)) throw new Error('Небезопасный путь данных, удаление отменено');
+  const exe = process.env.PORTABLE_EXECUTABLE_FILE || '';
+  const exeToDelete = deleteExe && app.isPackaged && exe && /\.exe$/i.test(exe) && !/["\r\n]/.test(exe) ? exe : '';
+
+  // 1) отозвать доступ приложения в аккаунте Google (если не получится — не страшно)
+  if (refreshToken) {
+    try {
+      await net('https://oauth2.googleapis.com/revoke?token=' + encodeURIComponent(refreshToken),
+        { method: 'POST', signal: AbortSignal.timeout(5000) });
+    } catch {}
+  }
+  // 2) убрать автозапуск
+  try {
+    const exePath = exe || process.execPath;
+    app.setLoginItemSettings({ openAtLogin: false, path: exePath });
+    app.setLoginItemSettings({ openAtLogin: false });
+  } catch {}
+  // 3) стереть данные из памяти и удалить файлы, сколько получится, пока приложение живо
+  accessToken = null; refreshToken = null; customSecret = '';
+  cache = { ranges: {} };
+  clearTimeout(cacheTimer);
+  notifyTimers.forEach(clearTimeout); notifyTimers = [];
+  for (const f of [tokenFile(), secretFile(), cacheFile(), settingsFile()]) { try { fs.rmSync(f, { force: true }); } catch {} }
+  // 4) после выхода внешний скрипт добивает всю папку (кэш Chromium и т.п.) и, по желанию, сам exe
+  if (process.platform === 'win32') {
+    const bat = path.join(os.tmpdir(), 'calendar-widget-cleanup-' + process.pid + '.bat');
+    fs.writeFileSync(bat, buildWipeScript(dataDir, exeToDelete));
+    spawn('cmd.exe', ['/c', bat], { detached: true, stdio: 'ignore', windowsHide: true }).unref();
+  } else {
+    spawn('sh', ['-c', 'sleep 3; rm -rf "$1"', 'sh', dataDir], { detached: true, stdio: 'ignore' }).unref();
+  }
+  quitting = true;
+  setTimeout(() => app.exit(0), 300);
+}
+
 /* ---------- окно ---------- */
 function visibleOnSomeDisplay(x, y) {
   return screen.getAllDisplays().some(d => {
@@ -537,6 +591,10 @@ function registerIpc() {
     }
   });
   ipcMain.on('notify:shifts', (_e, list) => setShiftList(list));
+  ipcMain.handle('app:wipe', async (_e, opts) => {
+    try { await wipeEverything(!!opts?.deleteExe); return { ok: true }; }
+    catch (e) { return { ok: false, message: e.message || String(e) }; }
+  });
   ipcMain.handle('sys:accent', () => accentHex());
   ipcMain.on('window:hide', () => win?.hide());
   ipcMain.on('window:fit', (_e, h) => {
