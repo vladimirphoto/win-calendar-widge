@@ -196,3 +196,9 @@ button:disabled { opacity: .55; }
 .ib svg.gear { width: 17px; height: 17px; stroke-width: 1.7; }
 .rate input[type=time] { width: 110px; flex: none; text-align: right; }
 input[type=time]::-webkit-calendar-picker-indicator { filter: invert(.6); cursor: pointer; }
+
+/* кнопки в настройках: всегда видны как кнопки, при наведении подсвечиваются акцентом */
+.panel .chip:not(.primary) { background: var(--hover); border-color: var(--line); transition: background .12s, border-color .12s; }
+.panel .chip:not(.primary):hover { background: color-mix(in srgb, var(--accent) 22%, var(--hover)); border-color: color-mix(in srgb, var(--accent) 60%, transparent); }
+.panel .chip:not(.primary):active { background: color-mix(in srgb, var(--accent) 32%, var(--hover)); }
+.panel .chip:disabled { opacity: .5; }
