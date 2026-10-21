@@ -190,3 +190,6 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
 .confirm p { font-size: 12.5px; line-height: 1.4; }
 .confirm[hidden] { display: none; }
 .toggle[hidden] { display: none; }
+
+.hint.bad { color: #d13438; }
+button:disabled { opacity: .55; }

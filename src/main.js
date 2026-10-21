@@ -9,6 +9,8 @@ const crypto = require('crypto');
 const os = require('os');
 const { spawn } = require('child_process');
 const EMBEDDED = require('./google-client');
+const { createUpdater } = require('./updater');
+const UPDATE_CFG = require('./update-config');
 
 const APP_ID = 'local.win.calendar.widget';
 const SCOPE = 'https://www.googleapis.com/auth/calendar.readonly';
@@ -26,6 +28,8 @@ const DEFAULTS = {
   locked: false,
   onlyMine: false, // true = показывать только события, подходящие под ключевые слова
   opacity: 0.92,
+  autoUpdate: true, // сам скачивать и ставить новые версии
+  lastUpdateTry: 0, // когда последний раз пробовали автоустановку (защита от зацикливания)
   notify: true,    // уведомление Windows перед сменой
   notifyHours: 2,  // за сколько часов
   rates: {},       // ставка за смену по студиям: { '#0b8043': 25000 }, ключ = цвет метки
@@ -90,7 +94,7 @@ function saveSettings() {
 }
 function publicSettings() {
   const { clientId, ...rest } = settings;
-  return { ...rest, customClient: !!clientId, packaged: app.isPackaged, canDeleteExe: !!process.env.PORTABLE_EXECUTABLE_FILE };
+  return { ...rest, customClient: !!clientId, packaged: app.isPackaged, canDeleteExe: !!process.env.PORTABLE_EXECUTABLE_FILE, version: app.getVersion() };
 }
 // какой OAuth-клиент использовать: свой из старых настроек, иначе вшитый
 function creds() {
@@ -348,6 +352,31 @@ function fireNotification(ev, key) {
   n.show();
 }
 
+/* ---------- обновления ---------- */
+const updater = createUpdater({
+  config: UPDATE_CFG,
+  getVersion: () => app.getVersion(),
+  // самообновление возможно только у собранного portable-exe
+  getExePath: () => (app.isPackaged && /\.exe$/i.test(process.env.PORTABLE_EXECUTABLE_FILE || '') ? process.env.PORTABLE_EXECUTABLE_FILE : ''),
+  send: st => send('update:state', st),
+  onQuit: () => { quitting = true; setTimeout(() => app.exit(0), 300); }
+});
+
+async function checkForUpdates({ auto = false } = {}) {
+  const st = await updater.check();
+  if (st.state !== 'available') return st;
+  if (auto && settings.autoUpdate && Date.now() - (settings.lastUpdateTry || 0) > 30 * 60 * 1000) {
+    settings.lastUpdateTry = Date.now(); saveSettings();
+    if (Notification.isSupported()) new Notification({ title: 'Обновление виджета', body: `Устанавливаю версию ${st.latest}, виджет перезапустится`, icon: iconPath }).show();
+    return updater.install();
+  }
+  if (auto && Notification.isSupported()) {
+    const n = new Notification({ title: 'Доступно обновление виджета', body: `Версия ${st.latest}. Установить можно в настройках ⚙.`, icon: iconPath });
+    n.on('click', () => { win?.show(); win?.focus(); }); n.show();
+  }
+  return st;
+}
+
 /* ---------- полное удаление данных ---------- */
 const batEsc = p => p.replace(/%/g, '%%');
 // Скрипт ждёт, пока приложение закроется (на Windows открытые файлы не удалить), и повторяет удаление до 15 раз
@@ -484,7 +513,7 @@ function applyWindowBehavior() {
 function updateSettings(patch) {
   const next = { ...settings };
   if (typeof patch.keywords === 'string') next.keywords = patch.keywords.slice(0, 200);
-  for (const k of ['autostart', 'alwaysOnTop', 'locked', 'onlyMine', 'notify']) {
+  for (const k of ['autostart', 'alwaysOnTop', 'locked', 'onlyMine', 'notify', 'autoUpdate']) {
     if (typeof patch[k] === 'boolean') next[k] = patch[k];
   }
   if (typeof patch.opacity === 'number' && isFinite(patch.opacity)) {
@@ -517,6 +546,7 @@ function refreshTray() {
   const menu = Menu.buildFromTemplate([
     { label: visible ? 'Скрыть виджет' : 'Показать виджет', click: toggleWindow },
     { label: 'Обновить события', click: () => send('app:refresh') },
+    { label: 'Проверить обновления виджета', click: () => { win?.show(); checkForUpdates({ auto: false }); } },
     { type: 'separator' },
     {
       label: 'Запускать при старте Windows', type: 'checkbox', checked: !!settings.autostart,
@@ -591,6 +621,9 @@ function registerIpc() {
     }
   });
   ipcMain.on('notify:shifts', (_e, list) => setShiftList(list));
+  ipcMain.handle('update:state', () => updater.getState());
+  ipcMain.handle('update:check', () => checkForUpdates({ auto: false }));
+  ipcMain.handle('update:install', async () => { settings.lastUpdateTry = Date.now(); saveSettings(); return updater.install(); });
   ipcMain.handle('app:wipe', async (_e, opts) => {
     try { await wipeEverything(!!opts?.deleteExe); return { ok: true }; }
     catch (e) { return { ok: false, message: e.message || String(e) }; }
@@ -626,6 +659,9 @@ if (!app.requestSingleInstanceLock()) {
     try {
       systemPreferences.on('accent-color-changed', () => send('sys:accent', accentHex()));
     } catch {}
+    // проверка обновлений: через 20 секунд после старта и затем каждые 6 часов
+    setTimeout(() => checkForUpdates({ auto: true }), 20 * 1000);
+    setInterval(() => checkForUpdates({ auto: true }), 6 * 3600 * 1000);
     powerMonitor.on('resume', () => setTimeout(() => send('app:refresh'), 4000));
     powerMonitor.on('unlock-screen', () => send('app:refresh'));
   });

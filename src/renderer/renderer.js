@@ -253,6 +253,8 @@ function applySettings(s) {
   $('tOnly').checked = !!s.onlyMine;
   $('devNote').hidden = !!s.packaged;
   $('tNotify').checked = !!s.notify;
+  $('tAutoUpd').checked = !!s.autoUpdate;
+  renderUpdate();
   if (document.activeElement !== $('fNotifyH')) $('fNotifyH').value = s.notifyHours;
   // ключевые слова могли поменяться — пересобрать подсветку из уже загруженных данных
   if (s.keywords !== lastKeys) {
@@ -433,6 +435,28 @@ $('tOnly').onchange = () => api.setSettings({ onlyMine: $('tOnly').checked });
 $('tTop').onchange = () => api.setSettings({ alwaysOnTop: $('tTop').checked });
 $('tLock').onchange = () => api.setSettings({ locked: $('tLock').checked });
 
+/* ---------- обновления ---------- */
+let upd = { state: 'idle' };
+function renderUpdate() {
+  const v = settings?.version || upd.current || '';
+  const st = upd.state, btn = $('btnUpd'), txt = $('updText');
+  btn.disabled = false;
+  let t = `Версия ${v}. `;
+  if (st === 'checking') { t += 'Проверяю…'; btn.disabled = true; btn.textContent = 'Проверяю…'; }
+  else if (st === 'available') { t += `Доступна версия ${upd.latest}.`; btn.textContent = `Установить ${upd.latest} и перезапустить`; }
+  else if (st === 'downloading') { t += `Скачиваю ${upd.latest}: ${upd.progress || 0}%`; btn.disabled = true; btn.textContent = 'Скачиваю…'; }
+  else if (st === 'installing') { t += 'Перезапускаю…'; btn.disabled = true; btn.textContent = 'Перезапуск…'; }
+  else if (st === 'uptodate') { t += 'У вас последняя версия.'; btn.textContent = 'Проверить обновления'; }
+  else if (st === 'error') { t += upd.message || 'Не удалось проверить обновления.'; btn.textContent = 'Проверить ещё раз'; }
+  else if (st === 'unsupported') { t += upd.message || ''; btn.textContent = 'Проверить обновления'; btn.disabled = true; }
+  else { btn.textContent = 'Проверить обновления'; }
+  txt.textContent = t.trim();
+  txt.classList.toggle('bad', st === 'error');
+}
+$('btnUpd').onclick = () => (upd.state === 'available' ? api.updateInstall() : api.updateCheck());
+$('tAutoUpd').onchange = () => api.setSettings({ autoUpdate: $('tAutoUpd').checked });
+api.onUpdate(s => { upd = s; renderUpdate(); });
+
 $('btnWipe').onclick = () => { $('wipeExeRow').hidden = !settings?.canDeleteExe; $('wipeBox').hidden = false; $('btnWipe').hidden = true; $('wipeBox').scrollIntoView({ block: 'nearest' }); };
 $('btnWipeNo').onclick = () => { $('wipeBox').hidden = true; $('btnWipe').hidden = false; };
 $('btnWipeYes').onclick = async () => {
@@ -462,6 +486,7 @@ api.onAuthChanged(v => { loggedIn = v; if (!v) { demo = true; upcoming = []; eve
   loggedIn = (await api.authStatus()).loggedIn;
   updateButtons();
   render();
+  api.updateState().then(s => { upd = s; renderUpdate(); });
   if (loggedIn) { await sync(); }
   else setStatus('', 'Показаны примеры — войдите в Google');
   // автообновление данных раз в 10 минут
