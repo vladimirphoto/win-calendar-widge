@@ -255,8 +255,34 @@ function applyAccent(hex) {
   root.setProperty('--on-accent', lum > 0.62 ? '#000' : '#fff');
 }
 
+/* тема: «Светлая» / «Тёмная» / «Стекло»; пока человек не выбрал, следуем теме Windows */
+const darkMQ = window.matchMedia('(prefers-color-scheme: dark)');
+const THEME_POS = { light: 0, dark: 1, glass: 2 };
+function effectiveTheme(s) {
+  const t = s?.theme;
+  return t === 'light' || t === 'dark' || t === 'glass' ? t : (darkMQ.matches ? 'dark' : 'light');
+}
+function applyTheme(s) {
+  const t = effectiveTheme(s);
+  document.documentElement.dataset.theme = t;
+  // у окна включена акриловая подложка: карточка занимает окно целиком, без полей под тень
+  document.body.classList.toggle('native-glass', t === 'glass' && !!s?.nativeGlass);
+  const seg = $('themeSeg');
+  if (!seg.dataset.ready) { // первый показ без анимации
+    seg.classList.add('noanim'); seg.dataset.ready = '1';
+    requestAnimationFrame(() => requestAnimationFrame(() => seg.classList.remove('noanim')));
+  }
+  seg.dataset.pos = String(THEME_POS[t]);
+  seg.querySelectorAll('button').forEach(b => {
+    const on = b.dataset.theme === t;
+    b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on));
+  });
+}
+darkMQ.addEventListener('change', () => { if (settings) { applyTheme(settings); fitWindow(); } });
+
 function applySettings(s) {
   settings = s;
+  applyTheme(s);
   if (!payTimer) dayPay = { ...(s.dayPay || {}) }; // пока человек вводит сумму, локальные значения главнее
   document.documentElement.style.setProperty('--alpha', String(s.opacity));
   document.body.classList.toggle('locked', !!s.locked);
@@ -342,6 +368,13 @@ function renderRates() {
     const name = document.createElement('span'); name.className = 'sn'; name.textContent = st.name; name.title = st.name;
     text.append(name);
     if (mine) { const who = document.createElement('span'); who.className = 'who'; who.textContent = mine; text.append(who); }
+    // точка студии для уведомления («На Маркова»); используется, если в событии календаря не указано место
+    const place = document.createElement('input');
+    place.type = 'text'; place.className = 'place'; place.maxLength = 60; place.spellcheck = false;
+    place.placeholder = 'Точка, напр.: Маркова';
+    place.dataset.p = st.key; place.setAttribute('aria-label', 'Точка студии ' + st.name);
+    const pv = settings?.places?.[st.key]; if (pv) place.value = pv;
+    text.append(place);
     const input = document.createElement('input');
     input.type = 'number'; input.min = '0'; input.step = '500'; input.inputMode = 'numeric';
     input.placeholder = '0'; input.dataset.k = st.key;
@@ -383,7 +416,12 @@ $('rates').addEventListener('input', () => {
     // студии, которых сейчас нет на экране, не теряем
     const shown = new Set(rateIn.map(i => i.dataset.k));
     for (const [k, v] of Object.entries(settings?.rates || {})) if (!shown.has(k)) rates[k] = v;
-    api.setSettings({ rates });
+    const places = {};
+    const placeIn = [...$('rates').querySelectorAll('input[data-p]')];
+    placeIn.forEach(i => { const t = i.value.trim(); if (t) places[i.dataset.p] = t; });
+    const shownP = new Set(placeIn.map(i => i.dataset.p));
+    for (const [k, v] of Object.entries(settings?.places || {})) if (!shownP.has(k)) places[k] = v;
+    api.setSettings({ rates, places });
   }, 400);
 });
 
@@ -405,7 +443,7 @@ function updateNext(pushToMain) {
     // смены на весь день уведомляют накануне вечером; без слов в «Что считать сменой» «сменой» считается всё подряд, поэтому их не шлём
     const hasKeys = hasAnyNames();
     api.setShifts(shifts.filter(e => e.start > now && (!e.allDay || hasKeys)).slice(0, 100)
-      .map(e => ({ id: e.id, title: e.title, start: e.start.getTime(), allDay: !!e.allDay, calendar: e.calendar || '' })));
+      .map(e => ({ id: e.id, title: e.title, start: e.start.getTime(), allDay: !!e.allDay, calendar: e.calendar || '', color: e.color || '', location: e.location || '' })));
   }
 }
 
@@ -433,7 +471,7 @@ function fitWindow() {
     if (!$('panel').hidden) return;
     const list = $('agList');
     const natural = $('card').offsetHeight - list.clientHeight + list.scrollHeight;
-    api.fit(natural + 32); // 32 = внешние отступы body
+    api.fit(natural + (document.body.classList.contains('native-glass') ? 0 : 32)); // 32 = внешние отступы body (в акриловом «Стекле» их нет)
   });
 }
 function showCfgErr(m) { const el = $('cfgErr'); el.textContent = m; el.hidden = false; }
@@ -481,6 +519,10 @@ $('segMine').onclick = () => {
   if (!hasAnyNames()) { openPanel(); $('fKeys').focus(); return; }
   api.setSettings({ onlyMine: true });
 };
+$('themeSeg').addEventListener('click', e => {
+  const b = e.target.closest('button[data-theme]');
+  if (b) api.setSettings({ theme: b.dataset.theme });
+});
 $('tOnly').onchange = () => api.setSettings({ onlyMine: $('tOnly').checked });
 $('tTop').onchange = () => api.setSettings({ alwaysOnTop: $('tTop').checked });
 $('tLock').onchange = () => api.setSettings({ locked: $('tLock').checked });

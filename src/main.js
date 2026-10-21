@@ -37,6 +37,8 @@ const DEFAULTS = {
   notifyHours: 2,  // за сколько часов
   dayPay: {},      // сумма за конкретный день и студию: { '2026-10-22|#0b8043': 12000 }, заменяет ставку по умолчанию
   rates: {},       // ставка за смену по студиям: { '#0b8043': 25000 }, ключ = цвет метки
+  places: {},      // точка студии для уведомления: { '#0b8043': 'Маркова' }, нужна, если в событии не указано место
+  theme: 'system', // 'system' | 'light' | 'dark' | 'glass'
   bounds: null
 };
 
@@ -120,7 +122,7 @@ function saveSettings() {
 }
 function publicSettings() {
   const { clientId, ...rest } = settings;
-  return { ...rest, customClient: !!clientId, packaged: app.isPackaged, canDeleteExe: !!process.env.PORTABLE_EXECUTABLE_FILE, version: app.getVersion() };
+  return { ...rest, customClient: !!clientId, packaged: app.isPackaged, nativeGlass, canDeleteExe: !!process.env.PORTABLE_EXECUTABLE_FILE, version: app.getVersion() };
 }
 // какой OAuth-клиент использовать: свой из старых настроек, иначе вшитый
 function creds() {
@@ -288,7 +290,8 @@ async function fetchEvents(timeMin, timeMax) {
           end: ev.end.dateTime || ev.end.date,
           // цвет метки события, если задан, иначе цвет самого календаря
           color: (ev.colorId && eventPalette[ev.colorId]?.background) || c.backgroundColor || null,
-          calendar: c.summaryOverride || c.summary || ''
+          calendar: c.summaryOverride || c.summary || '',
+          location: String(ev.location || '').slice(0, 200)
         });
       }
       pageToken = data.nextPageToken;
@@ -349,7 +352,8 @@ const liveNotes = new Set();   // держим ссылки, иначе клик
 function setShiftList(list) {
   shiftList = (Array.isArray(list) ? list : []).slice(0, 200)
     .filter(e => e && typeof e.id === 'string' && Number.isFinite(e.start))
-    .map(e => ({ id: e.id.slice(0, 200), title: String(e.title || '').slice(0, 120), start: e.start, allDay: e.allDay === true, calendar: String(e.calendar || '').slice(0, 120) }));
+    .map(e => ({ id: e.id.slice(0, 200), title: String(e.title || '').slice(0, 120), start: e.start, allDay: e.allDay === true, calendar: String(e.calendar || '').slice(0, 120),
+      color: /^#[0-9a-f]{3,8}$/i.test(e.color || '') ? e.color.toLowerCase() : '', location: String(e.location || '').slice(0, 200) }));
   rescheduleNotifications();
 }
 function rescheduleNotifications() {
@@ -370,15 +374,31 @@ function rescheduleNotifications() {
     notifyTimers.push(setTimeout(() => fireNotification(ev, key), Math.max(0, fireAt - now)));
   }
 }
+// точка смены: место из события календаря, иначе точка, заданная в карточке студии (настройки)
+function shiftPlace(ev) {
+  const fromEvent = String(ev.location || '').split(/\r?\n/)[0].trim();
+  const place = fromEvent || String((settings.places || {})[(ev.color || 'none').toLowerCase()] || '').trim();
+  return place.slice(0, 60);
+}
+// «Завтра смена в ВауФото» / «На Маркова» / «Прекрасного дня!»
+function eveNote(ev) {
+  const place = shiftPlace(ev);
+  return {
+    title: 'Завтра смена' + (ev.calendar ? ' в ' + ev.calendar : ''),
+    body: (place ? 'На ' + place + '\n' : '') + 'Прекрасного дня!'
+  };
+}
 function fireNotification(ev, key) {
   if (notified.has(key) || ev.start <= Date.now()) return;
   notified.add(key);
   if (notified.size > 500) notified.delete(notified.values().next().value); // не растёт бесконечно
-  if (ev.allDay) return showNote('Завтра смена' + (ev.calendar ? ' в ' + ev.calendar : ''), 'Прекрасного дня!');
+  if (ev.allDay) { const n = eveNote(ev); return showNote(n.title, n.body); }
   const mins = Math.max(1, Math.round((ev.start - Date.now()) / 60000));
   const left = mins >= 60 ? `${Math.floor(mins / 60)} ч${mins % 60 ? ' ' + (mins % 60) + ' мин' : ''}` : `${mins} мин`;
   const at = new Date(ev.start).toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' });
-  showNote('Скоро смена: ' + (ev.title || 'без названия'), `Начало в ${at}, через ${left}`);
+  const place = shiftPlace(ev);
+  showNote(ev.calendar ? 'Скоро смена в ' + ev.calendar : 'Скоро смена: ' + (ev.title || 'без названия'),
+    (place ? 'На ' + place + '\n' : '') + `Начало в ${at}, через ${left}`);
 }
 function showNote(title, body) {
   const n = new Notification({ title, body, icon: toastIcon() });
@@ -505,6 +525,7 @@ function createWindow() {
     }
   });
 
+  applyBackdrop();
   win.loadFile(path.join(__dirname, 'renderer', 'index.html'));
   win.once('ready-to-show', () => win.show());
 
@@ -543,9 +564,23 @@ function applyAutostart() {
     app.setLoginItemSettings({ openAtLogin: !!settings.autostart, path: exe });
   } catch (e) { console.error('autostart failed', e); }
 }
+// тема «Стекло»: на Windows 11 22H2+ просим у системы акриловую подложку окна (размытый рабочий стол под виджетом).
+// Если не поддерживается или не сработало, остаётся только CSS-версия стекла (nativeGlass = false)
+let nativeGlass = false;
+function applyBackdrop() {
+  if (!win || win.isDestroyed()) return;
+  const build = Number(os.release().split('.')[2]) || 0;
+  const can = process.platform === 'win32' && build >= 22621 && typeof win.setBackgroundMaterial === 'function';
+  const want = can && settings.theme === 'glass';
+  try {
+    if (can) win.setBackgroundMaterial(want ? 'acrylic' : 'none');
+    nativeGlass = want;
+  } catch (e) { nativeGlass = false; console.error('backgroundMaterial failed', e); }
+}
 function applyWindowBehavior() {
   if (!win) return;
   win.setAlwaysOnTop(!!settings.alwaysOnTop);
+  applyBackdrop();
 }
 
 function updateSettings(patch) {
@@ -559,6 +594,15 @@ function updateSettings(patch) {
   }
   if (typeof patch.notifyHours === 'number' && isFinite(patch.notifyHours)) {
     next.notifyHours = Math.min(48, Math.max(1, Math.round(patch.notifyHours)));
+  }
+  if (['system', 'light', 'dark', 'glass'].includes(patch.theme)) next.theme = patch.theme;
+  if (patch.places && typeof patch.places === 'object' && !Array.isArray(patch.places)) {
+    const places = {};
+    for (const [k, v] of Object.entries(patch.places).slice(0, 50)) {
+      const t = String(v ?? '').replace(/\s+/g, ' ').trim().slice(0, 60);
+      if (/^(#[0-9a-f]{3,8}|none)$/i.test(k) && t) places[k.toLowerCase()] = t;
+    }
+    next.places = places;
   }
   if (typeof patch.notifyEve === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(patch.notifyEve)) next.notifyEve = patch.notifyEve;
   if (patch.rates && typeof patch.rates === 'object' && !Array.isArray(patch.rates)) {
@@ -671,7 +715,10 @@ function registerIpc() {
   ipcMain.on('notify:shifts', (_e, list) => setShiftList(list));
   ipcMain.handle('notify:test', () => {
     if (!Notification.isSupported()) return { ok: false, message: 'Уведомления не поддерживаются в этой системе' };
-    showNote('Завтра смена в ВауФото', 'Прекрасного дня!');
+    // если уже есть ближайшая смена, показываем уведомление по её настоящим данным, иначе образец
+    const sample = shiftList[0] || { calendar: 'ВауФото', location: 'Маркова', color: '' };
+    const n = eveNote(sample);
+    showNote(n.title, n.body);
     return { ok: true };
   });
   ipcMain.handle('update:state', () => updater.getState());
