@@ -119,11 +119,15 @@ footer { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; al
 .fr .chip { white-space: nowrap; }
 .earn { font-size: 12.5px; font-weight: 600; color: var(--shift); white-space: nowrap; font-variant-numeric: tabular-nums; padding-right: 8px; }
 .earn[hidden] { display: none; }
-.seg { display: flex; padding: 2px; gap: 2px; border-radius: 8px; background: var(--layer); border: 1px solid var(--line); }
-.seg button { font-size: 12px; padding: 4px 12px; border-radius: 6px; color: var(--muted); transition: background .12s, color .12s; }
-.seg button:hover { background: var(--hover); color: var(--text); }
-.seg button.on { background: var(--accent); color: var(--on-accent); font-weight: 600; }
-.seg button.on:hover { filter: brightness(1.08); background: var(--accent); color: var(--on-accent); }
+.seg { position: relative; display: grid; grid-template-columns: 1fr 1fr; padding: 2px; border-radius: 9px; background: var(--layer); border: 1px solid var(--line); }
+/* подвижная подложка, как в iOS: одна на двоих, плавно переезжает между «Мои» и «Все» */
+.seg .thumb { position: absolute; top: 2px; bottom: 2px; left: 2px; width: calc((100% - 4px) / 2); border-radius: 7px; background: var(--accent); box-shadow: 0 1px 3px rgba(0, 0, 0, .28); transition: transform .28s cubic-bezier(.32, .72, .24, 1); }
+.seg[data-pos="1"] .thumb { transform: translateX(100%); }
+.seg.noanim .thumb { transition: none; }
+.seg button { position: relative; z-index: 1; font-size: 12px; font-weight: 500; padding: 4px 14px; border-radius: 7px; color: var(--muted); text-align: center; background: none; transition: color .2s; }
+.seg button:hover:not(.on) { color: var(--text); }
+.seg button.on { color: var(--on-accent); }
+@media (prefers-reduced-motion: reduce) { .seg .thumb { transition: none; } }
 .status i { width: 7px; height: 7px; border-radius: 50%; background: #9a9a9a; }
 .status.on i { background: #2ea043; }
 .status.busy i { background: var(--accent); animation: pulse 1s infinite; }

@@ -423,6 +423,11 @@ function closePanel() { $('panel').hidden = true; document.body.classList.remove
 
 function renderSeg() {
   const mine = !!settings?.onlyMine;
+  const seg = $('seg');
+  if (!seg.dataset.ready) { // первый показ без анимации, чтобы подложка не «ездила» при запуске
+    seg.classList.add('noanim'); seg.dataset.pos = mine ? '0' : '1'; seg.dataset.ready = '1';
+    requestAnimationFrame(() => requestAnimationFrame(() => seg.classList.remove('noanim')));
+  } else seg.dataset.pos = mine ? '0' : '1';
   $('segMine').classList.toggle('on', mine);
   $('segAll').classList.toggle('on', !mine);
   $('segMine').setAttribute('aria-pressed', String(mine));
