@@ -68,15 +68,6 @@ button { font: inherit; color: inherit; background: none; border: 0; border-radi
 .chip.primary:active { filter: brightness(.92); }
 button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 
-/* следующая смена */
-.next {
-  display: flex; align-items: center; gap: 8px; margin: 0 0 8px; padding: 7px 10px;
-  background: var(--layer); border: 1px solid var(--line); border-radius: 8px; font-size: 12.5px;
-}
-.next[hidden] { display: none; }
-.next i { width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--shift); }
-.next span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-
 /* сетка */
 .dows, .days { display: grid; grid-template-columns: repeat(7, 1fr); }
 .dows { margin-bottom: 2px; }
@@ -101,7 +92,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 
 /* повестка дня */
 .agenda { flex: 0 1 auto; min-height: 0; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); display: flex; flex-direction: column; }
-.agenda h3 { font-size: 13px; font-weight: 600; text-transform: capitalize; margin-bottom: 8px; }
+.agh { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+.agenda h3 { font-size: 13px; font-weight: 600; text-transform: capitalize; }
 .list { overflow-y: auto; flex: 0 1 auto; min-height: 0; padding-right: 2px; }
 .list::-webkit-scrollbar { width: 6px; }
 .list::-webkit-scrollbar-thumb { background: var(--hover); border-radius: 3px; }
@@ -125,7 +117,7 @@ footer { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr
 footer > .status, footer > .seg { margin-bottom: 2px; }
 .fr { justify-self: end; display: flex; flex-direction: column; align-items: flex-end; gap: 3px; min-width: 0; }
 .fr .chip { white-space: nowrap; }
-.earn { font-size: 12.5px; font-weight: 600; color: var(--shift); white-space: nowrap; font-variant-numeric: tabular-nums; padding-right: 10px; }
+.earn { font-size: 12.5px; font-weight: 600; color: var(--shift); white-space: nowrap; font-variant-numeric: tabular-nums; padding-right: 8px; }
 .earn[hidden] { display: none; }
 .seg { display: flex; padding: 2px; gap: 2px; border-radius: 8px; background: var(--layer); border: 1px solid var(--line); }
 .seg button { font-size: 12px; padding: 4px 12px; border-radius: 6px; color: var(--muted); transition: background .12s, color .12s; }

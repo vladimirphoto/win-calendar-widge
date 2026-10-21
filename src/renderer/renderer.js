@@ -203,7 +203,7 @@ function render() {
   let sub = n ? `${n} ${plural(n, 'смена', 'смены', 'смен')}` : '';
   if (n && demo) sub += ' (пример)';
   $('sub').textContent = sub;
-  // заработок: над кнопкой «Обновить»
+  // заработок за месяц: справа от даты над списком
   const earnEl = $('earn');
   const showEarn = n > 0 && earn > 0;
   if (showEarn) earnEl.textContent = 'Заработок: ' + money(earn);
@@ -351,18 +351,6 @@ function updateNext(pushToMain) {
     api.setShifts(shifts.filter(e => !e.allDay && e.start > now).slice(0, 100)
       .map(e => ({ id: e.id, title: e.title, start: e.start.getTime() })));
   }
-  const box = $('next');
-  const cur = shifts.find(e => !e.allDay && e.start <= now);
-  const nxt = shifts.find(e => e.start > now);
-  const e = cur || nxt;
-  if (!e) { if (!box.hidden) { box.hidden = true; fitWindow(); } return; }
-  const text = cur
-    ? `Сейчас: ${cur.title}, до ${fmtT(cur.end)}`
-    : `Следующая: ${dayWord(e.start)}, ${e.allDay ? 'весь день' : fmtT(e.start)}, ${e.title}`;
-  $('nextText').textContent = text;
-  $('next').title = text;
-  $('nextDot').style.background = e.color || 'var(--shift)';
-  if (box.hidden) { box.hidden = false; fitWindow(); }
 }
 
 function openPanel() { renderRates(); $('panel').hidden = false; document.body.classList.add('panel-open'); api.fit(10000); }
