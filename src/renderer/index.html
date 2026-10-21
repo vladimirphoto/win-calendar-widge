@@ -22,7 +22,7 @@
         <svg viewBox="0 0 16 16"><path d="m6 3 5 5-5 5" /></svg>
       </button>
       <button class="ib" id="btnCfg" title="Настройки" aria-label="Настройки">
-        <svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="2.2"/><path d="M8 1.5v1.6M8 12.9v1.6M1.5 8h1.6M12.9 8h1.6M3.4 3.4l1.1 1.1M11.5 11.5l1.1 1.1M3.4 12.6l1.1-1.1M11.5 4.5l1.1-1.1"/></svg>
+        <svg class="gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
       </button>
       <button class="ib" id="btnHide" title="Скрыть в трей" aria-label="Скрыть в трей">
         <svg viewBox="0 0 16 16"><path d="m4 4 8 8M12 4l-8 8"/></svg>
@@ -84,7 +84,11 @@
       <input id="fNotifyH" type="number" min="1" max="48" step="1" inputmode="numeric">
       <span class="cur">ч</span>
     </div>
-    <p class="hint">Для смен «на весь день» напоминание приходит накануне в 20:00 (нужны слова в поле «Что считать сменой»).</p>
+    <div class="rate">
+      <label class="nm" for="fNotifyEve">Накануне, для смен «на весь день»</label>
+      <input id="fNotifyEve" type="time">
+    </div>
+    <p class="hint">Нужны слова в поле «Что считать сменой», иначе напоминания не приходят.</p>
     <div class="row"><button class="chip" id="btnNotifyTest" type="button">Уведомить сейчас</button><span class="hint" id="notifyMsg" style="margin:0;align-self:center"></span></div>
 
     <h3 class="sect">Google Календарь</h3>

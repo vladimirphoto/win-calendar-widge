@@ -31,6 +31,7 @@ const DEFAULTS = {
   autoUpdate: true, // сам скачивать и ставить новые версии
   lastUpdateTry: 0, // когда последний раз пробовали автоустановку (защита от зацикливания)
   notify: true,    // уведомление Windows перед сменой
+  notifyEve: '20:00', // для смен «на весь день»: во сколько напомнить накануне
   notifyHours: 2,  // за сколько часов
   dayPay: {},      // сумма за конкретный день и студию: { '2026-10-22|#0b8043': 12000 }, заменяет ставку по умолчанию
   rates: {},       // ставка за смену по студиям: { '#0b8043': 25000 }, ключ = цвет метки
@@ -318,7 +319,6 @@ function cacheLookup(key, fromMs, toMs) {
 
 /* ---------- уведомления о сменах ---------- */
 let shiftList = [];            // ближайшие смены от интерфейса: { id, title, start, end } в мс
-const ALLDAY_LEAD_H = 4;      // для смен на весь день: уведомление накануне в 20:00
 let notifyTimers = [];
 const notified = new Set();
 const liveNotes = new Set();   // держим ссылки, иначе клик по уведомлению может потеряться
@@ -335,11 +335,16 @@ function rescheduleNotifications() {
   const now = Date.now();
   for (const ev of shiftList) {
     if (ev.start <= now || ev.start - now > NOTIFY_HORIZON) continue;
-    // смена «на весь день» не имеет времени начала: напоминаем накануне в 20:00 (за 4 часа до полуночи)
-    const lead = (ev.allDay ? ALLDAY_LEAD_H : settings.notifyHours) * 3600 * 1000;
-    const key = `${ev.id}|${ev.start}|${ev.allDay ? 'd' : settings.notifyHours}`;
+    // смена «на весь день» не имеет времени начала: напоминаем накануне в заданное время (по умолчанию 20:00)
+    let fireAt;
+    if (ev.allDay) {
+      const [h, m] = (settings.notifyEve || '20:00').split(':').map(Number);
+      const d = new Date(ev.start); d.setDate(d.getDate() - 1); d.setHours(h, m, 0, 0);
+      fireAt = d.getTime();
+    } else fireAt = ev.start - settings.notifyHours * 3600 * 1000;
+    const key = `${ev.id}|${ev.start}|${ev.allDay ? 'd' + settings.notifyEve : settings.notifyHours}`;
     if (notified.has(key)) continue;
-    notifyTimers.push(setTimeout(() => fireNotification(ev, key), Math.max(0, ev.start - lead - now)));
+    notifyTimers.push(setTimeout(() => fireNotification(ev, key), Math.max(0, fireAt - now)));
   }
 }
 function fireNotification(ev, key) {
@@ -531,6 +536,7 @@ function updateSettings(patch) {
   if (typeof patch.notifyHours === 'number' && isFinite(patch.notifyHours)) {
     next.notifyHours = Math.min(48, Math.max(1, Math.round(patch.notifyHours)));
   }
+  if (typeof patch.notifyEve === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(patch.notifyEve)) next.notifyEve = patch.notifyEve;
   if (patch.rates && typeof patch.rates === 'object' && !Array.isArray(patch.rates)) {
     const rates = {};
     for (const [k, v] of Object.entries(patch.rates).slice(0, 50)) {

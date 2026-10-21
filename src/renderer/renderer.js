@@ -277,6 +277,7 @@ function applySettings(s) {
   $('tAutoUpd').checked = !!s.autoUpdate;
   renderUpdate();
   if (document.activeElement !== $('fNotifyH')) $('fNotifyH').value = s.notifyHours;
+  if (document.activeElement !== $('fNotifyEve')) $('fNotifyEve').value = s.notifyEve || '20:00';
   // ключевые слова могли поменяться — пересобрать подсветку из уже загруженных данных
   if (s.keywords !== lastKeys) {
     lastKeys = s.keywords;
@@ -515,6 +516,7 @@ $('btnClearPay').onclick = async () => {
   render();
 };
 $('tNotify').onchange = () => api.setSettings({ notify: $('tNotify').checked });
+$('fNotifyEve').addEventListener('change', () => { if ($('fNotifyEve').value) api.setSettings({ notifyEve: $('fNotifyEve').value }); });
 let notifyTimer;
 $('fNotifyH').addEventListener('input', () => {
   clearTimeout(notifyTimer);
