@@ -32,9 +32,15 @@ jobs:
           tag_name: latest
           name: CalendarWidget 1.0.${{ github.run_number }}
           files: dist/CalendarWidget.exe
+      - name: Check RELEASES_TOKEN
+        shell: bash
+        run: |
+          if [ -z "$RELEASES_TOKEN" ]; then
+            echo "::error::Секрет RELEASES_TOKEN не задан: обновления в виджет не попадут. Settings -> Secrets and variables -> Actions -> New repository secret"
+            exit 1
+          fi
       # Публичная копия релиза для самообновления виджетов (нужен секрет RELEASES_TOKEN, см. README)
       - name: Publish to public releases repo
-        if: ${{ env.RELEASES_TOKEN != '' }}
         uses: softprops/action-gh-release@v2
         with:
           repository: vladimirphoto/win-calendar-widget-releases
