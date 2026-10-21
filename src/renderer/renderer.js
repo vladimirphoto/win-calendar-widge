@@ -11,6 +11,11 @@ let loggedIn = false;
 let demo = true;
 let syncing = false;
 let lastSync = null;
+let offline = false;
+let upcoming = [];        // события от сегодняшнего дня (не зависят от того, какой месяц листают)
+let lastKeys = null;
+let lastActivity = Date.now();
+const IDLE_RETURN_MS = 2 * 60 * 1000; // через 2 минуты без действий вернуться на сегодня
 
 /* ---------- утилиты ---------- */
 const pad = n => String(n).padStart(2, '0');
@@ -19,6 +24,10 @@ const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;'
 const fmtT = d => d.toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' });
 const localDate = s => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
 const sameMonth = (a, b) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth();
+
+const money = n => Math.round(n).toLocaleString('ru-RU') + ' ₸';
+const rateKey = c => (c || 'none').toLowerCase();
+const isToday = d => ymd(d) === ymd(new Date());
 
 function plural(n, one, few, many) {
   const m10 = n % 10, m100 = n % 100;
@@ -41,13 +50,18 @@ function visibleEvents(key) {
 }
 
 /* ---------- данные ---------- */
+function parseEv(raw) {
+  let start, end;
+  if (raw.allDay) { start = localDate(raw.start); end = localDate(raw.end); }
+  else { start = new Date(raw.start); end = new Date(raw.end); }
+  return { ...raw, start, end, shift: isShift(raw.title) };
+}
+
 function indexEvents(list) {
   const map = {};
   for (const raw of list) {
-    let start, end;
-    if (raw.allDay) { start = localDate(raw.start); end = localDate(raw.end); }
-    else { start = new Date(raw.start); end = new Date(raw.end); }
-    const ev = { ...raw, start, end, shift: isShift(raw.title) };
+    const ev = parseEv(raw);
+    const { start, end } = ev;
     // последний день: для «весь день» и для событий, заканчивающихся ровно в полночь, конец не включаем
     const last = new Date(end.getTime() - 1);
     const stop = last < start ? start : last;
@@ -87,22 +101,27 @@ async function sync() {
   syncing = false;
   if (res.ok) {
     demo = false;
+    offline = !!res.offline;
     events = indexEvents(res.events);
-    lastSync = new Date();
-    setStatus('on', 'Обновлено ' + fmtT(lastSync));
+    lastSync = new Date(res.savedAt || Date.now());
+    if (offline) setStatus('off', 'Офлайн · данные от ' + fmtT(lastSync));
+    else setStatus('on', 'Обновлено ' + fmtT(lastSync));
+    const now = Date.now();
+    if (from.getTime() <= now && now < to.getTime()) upcoming = res.events.map(parseEv);
     render();
+    renderRates();
+    updateNext(true);
   } else if (res.code === 'NOT_AUTH') {
-    loggedIn = false; demo = true;
+    loggedIn = false; demo = true; upcoming = [];
     events = indexEvents(demoEvents());
     setStatus('', 'Нужен вход в Google');
-    updateButtons(); render();
+    updateButtons(); render(); updateNext(true);
   } else {
-    setStatus('err', 'Ошибка: ' + (res.message || 'не удалось обновить'));
+    setStatus(res.code === 'OFFLINE' ? 'off' : 'err', res.code === 'OFFLINE' ? 'Нет интернета' : 'Ошибка: ' + (res.message || 'не удалось обновить'));
   }
 }
 
 async function doLogin() {
-  if (!settings.clientId) { openPanel(); showCfgErr('Сначала укажите Client ID и Client secret.'); return; }
   setStatus('busy', 'Ожидаю вход в браузере…');
   const res = await api.login();
   if (res.ok) {
@@ -112,6 +131,7 @@ async function doLogin() {
   } else {
     setStatus('err', 'Вход не выполнен');
     if (!$('panel').hidden) showCfgErr(res.message);
+    else setStatus('err', 'Вход не выполнен: ' + (res.message || 'ошибка'));
   }
 }
 
@@ -122,7 +142,13 @@ function setStatus(kind, text) {
 }
 function updateButtons() {
   $('btnSync').textContent = loggedIn ? 'Обновить' : 'Войти в Google';
-  $('btnLogout').disabled = !loggedIn;
+  $('btnLogout').hidden = !loggedIn;
+  $('btnLogin').hidden = loggedIn;
+  $('authHint').textContent = loggedIn
+    ? 'Вы вошли. Доступ только на чтение календаря.'
+    : (settings?.customClient
+      ? 'Используется ваш Client ID из прежних настроек.'
+      : 'Откроется браузер, разрешите доступ «только чтение». Пароль виджету не передаётся.');
 }
 
 const colorOrder = [];
@@ -162,21 +188,22 @@ function render() {
       el.style.setProperty('--sg', `linear-gradient(90deg, ${cs.map((c, i) => `${c} ${i * step}% ${(i + 1) * step}%`).join(', ')})`);
     }
   });
-  grid.querySelectorAll('.day').forEach(el => {
-    el.onclick = () => { sel = localDate(el.dataset.k); if (!sameMonth(sel, view)) { view = new Date(sel.getFullYear(), sel.getMonth(), 1); sync(); } render(); };
-  });
 
-  // счётчик смен в отображаемом месяце
-  const seen = new Set(); let n = 0;
+  // счётчик смен и заработок в отображаемом месяце
+  const seen = new Set(); let n = 0, earn = 0;
+  const rates = settings?.rates || {};
   for (const [k, list] of Object.entries(events)) {
     if (!sameMonth(localDate(k), view)) continue;
     for (const e of list) {
       if (!e.shift) continue;
       const id = e.id + '|' + e.start.getTime();
-      if (!seen.has(id)) { seen.add(id); n++; }
+      if (!seen.has(id)) { seen.add(id); n++; earn += rates[rateKey(e.color)] || 0; }
     }
   }
-  $('sub').textContent = n ? `${n} ${plural(n, 'смена', 'смены', 'смен')} в этом месяце${demo ? ' (пример)' : ''}` : '';
+  let sub = n ? `${n} ${plural(n, 'смена', 'смены', 'смен')}` : '';
+  if (n && earn > 0) sub += ` · ${money(earn)}`;
+  if (n && demo) sub += ' (пример)';
+  $('sub').textContent = sub;
   renderAgenda();
   renderSeg();
   fitWindow();
@@ -221,17 +248,118 @@ function applySettings(s) {
   $('tLock').checked = !!s.locked;
   $('tOnly').checked = !!s.onlyMine;
   $('devNote').hidden = !!s.packaged;
-  if (document.activeElement !== $('fClient')) $('fClient').value = s.clientId || '';
-  $('fSecret').placeholder = s.hasSecret ? '•••••••• (сохранён)' : 'GOCSPX-…';
+  $('tNotify').checked = !!s.notify;
+  if (document.activeElement !== $('fNotifyH')) $('fNotifyH').value = s.notifyHours;
   // ключевые слова могли поменяться — пересобрать подсветку из уже загруженных данных
-  const flat = new Map();
-  Object.values(events).flat().forEach(e => flat.set(e.id + '|' + e.start.getTime(), e));
-  const raw = [...flat.values()].map(e => ({ ...e, start: e.allDay ? ymd(e.start) : e.start.toISOString(), end: e.allDay ? ymd(e.end) : e.end.toISOString() }));
-  events = indexEvents(raw);
+  if (s.keywords !== lastKeys) {
+    lastKeys = s.keywords;
+    const flat = new Map();
+    Object.values(events).flat().forEach(e => flat.set(e.id + '|' + e.start.getTime(), e));
+    const raw = [...flat.values()].map(e => ({ ...e, start: e.allDay ? ymd(e.start) : e.start.toISOString(), end: e.allDay ? ymd(e.end) : e.end.toISOString() }));
+    events = indexEvents(raw);
+    upcoming = upcoming.map(e => ({ ...e, shift: isShift(e.title) }));
+  }
+  updateButtons();
+  renderRates();
   render();
+  updateNext(true);
 }
 
-function openPanel() { $('panel').hidden = false; document.body.classList.add('panel-open'); api.fit(10000); }
+/* ---------- ставки по студиям ---------- */
+// студия определяется цветом метки; подпись — самое частое название события этого цвета
+function studiosList() {
+  const info = new Map();
+  const add = e => {
+    const k = rateKey(e.color);
+    const it = info.get(k) || { key: k, color: e.color || '', titles: new Map() };
+    it.titles.set(e.title, (it.titles.get(e.title) || 0) + 1);
+    info.set(k, it);
+  };
+  if (!demo) {
+    const seen = new Set();
+    for (const e of Object.values(events).flat()) {
+      const id = e.id + '|' + e.start.getTime();
+      if (e.shift && !seen.has(id)) { seen.add(id); add(e); }
+    }
+  }
+  for (const k of Object.keys(settings?.rates || {})) {
+    if (!info.has(k)) info.set(k, { key: k, color: k === 'none' ? '' : k, titles: new Map() });
+  }
+  return [...info.values()].map(it => {
+    const top = [...it.titles.entries()].sort((a, b) => b[1] - a[1])[0];
+    return { key: it.key, color: it.color, name: top ? top[0] : (it.color ? 'Студия ' + it.color : 'Без цвета') };
+  }).sort((a, b) => a.name.localeCompare(b.name, 'ru'));
+}
+
+function renderRates() {
+  const box = $('rates');
+  if (box.contains(document.activeElement)) return; // не перерисовывать, пока человек вводит сумму
+  const list = studiosList();
+  $('ratesEmpty').hidden = list.length > 0;
+  box.textContent = '';
+  for (const st of list) {
+    const row = document.createElement('div'); row.className = 'rate';
+    const label = document.createElement('label'); label.className = 'nm';
+    const dot = document.createElement('b'); if (st.color) dot.style.background = st.color;
+    const name = document.createElement('span'); name.textContent = st.name;
+    const input = document.createElement('input');
+    input.type = 'number'; input.min = '0'; input.step = '500'; input.inputMode = 'numeric';
+    input.placeholder = '0'; input.dataset.k = st.key;
+    input.id = 'rate-' + st.key.replace(/[^a-z0-9]/gi, '');
+    const v = settings?.rates?.[st.key]; if (v) input.value = String(v);
+    label.htmlFor = input.id; label.append(dot, name);
+    const cur = document.createElement('span'); cur.className = 'cur'; cur.textContent = '₸';
+    row.append(label, input, cur);
+    box.append(row);
+  }
+}
+
+let ratesTimer;
+$('rates').addEventListener('input', () => {
+  clearTimeout(ratesTimer);
+  ratesTimer = setTimeout(() => {
+    const rates = {};
+    $('rates').querySelectorAll('input').forEach(i => { const n = Number(i.value); if (n > 0) rates[i.dataset.k] = n; });
+    // ставки студий, которых сейчас нет на экране, не теряем
+    const shown = new Set([...$('rates').querySelectorAll('input')].map(i => i.dataset.k));
+    for (const [k, v] of Object.entries(settings?.rates || {})) if (!shown.has(k)) rates[k] = v;
+    api.setSettings({ rates });
+  }, 400);
+});
+
+/* ---------- следующая смена и уведомления ---------- */
+function dayWord(d) {
+  const t = new Date(); t.setHours(0, 0, 0, 0);
+  const diff = Math.round((new Date(d.getFullYear(), d.getMonth(), d.getDate()) - t) / 864e5);
+  if (diff === 0) return 'сегодня';
+  if (diff === 1) return 'завтра';
+  if (diff === 2) return 'послезавтра';
+  return d.toLocaleDateString('ru', { weekday: 'short', day: 'numeric', month: 'short' });
+}
+
+function updateNext(pushToMain) {
+  const now = new Date();
+  const shifts = (loggedIn && !demo ? upcoming : []).filter(e => e.shift && e.end > now);
+  shifts.sort((a, b) => a.start - b.start);
+  if (pushToMain) {
+    api.setShifts(shifts.filter(e => !e.allDay && e.start > now).slice(0, 100)
+      .map(e => ({ id: e.id, title: e.title, start: e.start.getTime() })));
+  }
+  const box = $('next');
+  const cur = shifts.find(e => !e.allDay && e.start <= now);
+  const nxt = shifts.find(e => e.start > now);
+  const e = cur || nxt;
+  if (!e) { if (!box.hidden) { box.hidden = true; fitWindow(); } return; }
+  const text = cur
+    ? `Сейчас: ${cur.title}, до ${fmtT(cur.end)}`
+    : `Следующая: ${dayWord(e.start)}, ${e.allDay ? 'весь день' : fmtT(e.start)}, ${e.title}`;
+  $('nextText').textContent = text;
+  $('next').title = text;
+  $('nextDot').style.background = e.color || 'var(--shift)';
+  if (box.hidden) { box.hidden = false; fitWindow(); }
+}
+
+function openPanel() { renderRates(); $('panel').hidden = false; document.body.classList.add('panel-open'); api.fit(10000); }
 function closePanel() { $('panel').hidden = true; document.body.classList.remove('panel-open'); hideCfgErr(); fitWindow(); }
 
 function renderSeg() {
@@ -263,12 +391,23 @@ function shiftMonth(delta) {
 }
 $('btnPrev').onclick = () => shiftMonth(-1);
 $('btnNext').onclick = () => shiftMonth(1);
-$('btnToday').onclick = () => { view = new Date(); view.setDate(1); sel = new Date(); render(); sync(); };
+function goToday() { view = new Date(); view.setDate(1); view.setHours(0, 0, 0, 0); sel = new Date(); render(); sync(); }
+$('btnToday').onclick = goToday;
 $('btnHide').onclick = () => api.hide();
 $('btnCfg').onclick = openPanel;
 $('btnDone').onclick = closePanel;
 $('btnSync').onclick = () => (loggedIn ? sync() : doLogin());
-$('btnLogout').onclick = async () => { await api.logout(); loggedIn = false; demo = true; events = indexEvents(demoEvents()); updateButtons(); setStatus('', 'Не подключено'); render(); };
+$('btnLogin').onclick = () => doLogin();
+$('btnLogout').onclick = async () => { await api.logout(); loggedIn = false; demo = true; upcoming = []; events = indexEvents(demoEvents()); updateButtons(); setStatus('', 'Не подключено'); render(); updateNext(true); };
+$('days').addEventListener('click', e => {
+  const el = e.target.closest('.day');
+  if (!el) return;
+  sel = localDate(el.dataset.k);
+  if (!sameMonth(sel, view)) { view = new Date(sel.getFullYear(), sel.getMonth(), 1); sync(); }
+  render();
+});
+// любое действие сбрасывает таймер «вернуться на сегодня»
+for (const t of ['pointerdown', 'wheel', 'keydown']) document.addEventListener(t, () => { lastActivity = Date.now(); }, true);
 
 $('days').addEventListener('wheel', e => { e.preventDefault(); shiftMonth(e.deltaY > 0 ? 1 : -1); }, { passive: false });
 document.addEventListener('keydown', e => {
@@ -290,24 +429,19 @@ $('tOnly').onchange = () => api.setSettings({ onlyMine: $('tOnly').checked });
 $('tTop').onchange = () => api.setSettings({ alwaysOnTop: $('tTop').checked });
 $('tLock').onchange = () => api.setSettings({ locked: $('tLock').checked });
 
-$('btnSaveG').onclick = async () => {
-  hideCfgErr();
-  const patch = { clientId: $('fClient').value };
-  if ($('fSecret').value.trim()) patch.clientSecret = $('fSecret').value;
-  const s = await api.setSettings(patch);
-  $('fSecret').value = '';
-  if (!s.clientId) { showCfgErr('Укажите Client ID.'); return; }
-  loggedIn = false; updateButtons();
-  await doLogin();
-  if (loggedIn) closePanel();
-};
+$('tNotify').onchange = () => api.setSettings({ notify: $('tNotify').checked });
+let notifyTimer;
+$('fNotifyH').addEventListener('input', () => {
+  clearTimeout(notifyTimer);
+  notifyTimer = setTimeout(() => { const n = Number($('fNotifyH').value); if (n >= 1) api.setSettings({ notifyHours: n }); }, 500);
+});
 
 /* ---------- события от main ---------- */
 api.onAccent(applyAccent);
 api.onRefresh(() => sync());
 api.onLogin(() => doLogin());
 api.onSettings(applySettings);
-api.onAuthChanged(v => { loggedIn = v; if (!v) { demo = true; events = indexEvents(demoEvents()); setStatus('', 'Не подключено'); } updateButtons(); render(); });
+api.onAuthChanged(v => { loggedIn = v; if (!v) { demo = true; upcoming = []; events = indexEvents(demoEvents()); setStatus('', 'Не подключено'); } updateButtons(); render(); updateNext(true); });
 
 /* ---------- старт ---------- */
 (async function init() {
@@ -318,9 +452,16 @@ api.onAuthChanged(v => { loggedIn = v; if (!v) { demo = true; events = indexEven
   updateButtons();
   render();
   if (loggedIn) { await sync(); }
-  else setStatus('', settings.clientId ? 'Войдите в Google' : 'Показаны примеры — настройте Google в ⚙');
+  else setStatus('', 'Показаны примеры — войдите в Google');
+  // автообновление данных раз в 10 минут
   setInterval(() => { if (loggedIn) sync(); }, 10 * 60 * 1000);
-  // дата сменилась после полуночи — перерисовать «сегодня»
+  // раз в минуту: смена даты после полуночи, «Следующая смена», возврат на сегодня после бездействия
   let lastDay = ymd(new Date());
-  setInterval(() => { const k = ymd(new Date()); if (k !== lastDay) { lastDay = k; render(); } }, 60 * 1000);
+  setInterval(() => {
+    const k = ymd(new Date());
+    if (k !== lastDay) { lastDay = k; render(); if (loggedIn) sync(); }
+    updateNext(false);
+    const away = !isToday(sel) || !sameMonth(view, new Date());
+    if (away && $('panel').hidden && Date.now() - lastActivity >= IDLE_RETURN_MS) goToday();
+  }, 30 * 1000);
 })();

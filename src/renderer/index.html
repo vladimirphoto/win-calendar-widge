@@ -30,6 +30,8 @@
     </div>
   </header>
 
+  <div class="next" id="next" hidden><i id="nextDot"></i><span id="nextText"></span></div>
+
   <div class="dows" id="dows"></div>
   <div class="days" id="days"></div>
 
@@ -71,20 +73,25 @@
     <div class="toggle"><span>Закрепить положение</span><label class="sw"><input type="checkbox" id="tLock"><b></b></label></div>
     <p class="hint" id="devNote" hidden>Автозапуск работает только в установленной версии (после npm run dist).</p>
 
+    <h3 class="sect">Заработок</h3>
+    <p class="hint">Ставка за одну смену в тенге, отдельно для каждой студии. Считаются только ваши смены; сумма показывается под названием месяца.</p>
+    <div id="rates"></div>
+    <p class="hint" id="ratesEmpty">Студии появятся после первой синхронизации с календарём.</p>
+
+    <h3 class="sect">Уведомления</h3>
+    <div class="toggle"><span>Напоминать о смене (уведомление Windows)</span><label class="sw"><input type="checkbox" id="tNotify"><b></b></label></div>
+    <div class="rate">
+      <label class="nm" for="fNotifyH">За сколько часов до начала</label>
+      <input id="fNotifyH" type="number" min="1" max="48" step="1" inputmode="numeric">
+      <span class="cur">ч</span>
+    </div>
+
     <h3 class="sect">Google Календарь</h3>
-    <div class="field">
-      <label for="fClient">Client ID</label>
-      <input id="fClient" type="text" placeholder="xxxx.apps.googleusercontent.com" spellcheck="false" autocomplete="off">
-    </div>
-    <div class="field">
-      <label for="fSecret">Client secret</label>
-      <input id="fSecret" type="password" placeholder="GOCSPX-…" spellcheck="false" autocomplete="off">
-    </div>
     <div class="row">
-      <button class="chip primary" id="btnSaveG">Сохранить и войти</button>
+      <button class="chip primary" id="btnLogin">Войти через Google</button>
       <button class="chip" id="btnLogout">Выйти</button>
     </div>
-    <p class="hint">Данные нужны один раз. Пошаговая инструкция, как получить Client ID, есть в README.</p>
+    <p class="hint" id="authHint"></p>
     <p class="err" id="cfgErr" hidden></p>
   </section>
 </main>

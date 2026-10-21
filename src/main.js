@@ -1,30 +1,38 @@
 const {
   app, BrowserWindow, Tray, Menu, ipcMain, shell, screen, nativeImage,
-  safeStorage, systemPreferences, powerMonitor
+  safeStorage, systemPreferences, powerMonitor, Notification
 } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const http = require('http');
 const crypto = require('crypto');
+const EMBEDDED = require('./google-client');
 
+const APP_ID = 'local.win.calendar.widget';
 const SCOPE = 'https://www.googleapis.com/auth/calendar.readonly';
 const WIN_W = 420;
 const WIN_H = 660;
 const WIN_MIN_H = 360;
+const CACHE_RANGES = 8;          // сколько периодов держать в офлайн-кэше
+const NOTIFY_HORIZON = 7 * 24 * 3600 * 1000;
 
 const DEFAULTS = {
   keywords: '', // пусто = все события календаря считаются сменами и красятся цветом студии
-  clientId: '',
-  clientSecret: '',
+  clientId: '', // свой Client ID (старые настройки); пусто = используется вшитый
   autostart: true,
   alwaysOnTop: false,
   locked: false,
   onlyMine: false, // true = показывать только события, подходящие под ключевые слова
   opacity: 0.92,
+  notify: true,    // уведомление Windows перед сменой
+  notifyHours: 2,  // за сколько часов
+  rates: {},       // ставка за смену по студиям: { '#0b8043': 25000 }, ключ = цвет метки
   bounds: null
 };
 
 let settings = { ...DEFAULTS };
+let customSecret = '';       // secret от своего Client ID (старые настройки), хранится зашифрованным
+let secretPlain = false;     // true, если шифрование недоступно и secret остался в settings.json
 let win = null;
 let tray = null;
 let quitting = false;
@@ -33,26 +41,59 @@ let accessExpiresAt = 0;
 let refreshToken = null;     // хранится зашифрованным (DPAPI через safeStorage)
 let loginInProgress = false;
 
-const settingsFile = () => path.join(app.getPath('userData'), 'settings.json');
-const tokenFile = () => path.join(app.getPath('userData'), 'token.bin');
+app.setAppUserModelId(APP_ID); // без этого Windows не показывает уведомления от exe
+
+const dataPath = name => path.join(app.getPath('userData'), name);
+const settingsFile = () => dataPath('settings.json');
+const tokenFile = () => dataPath('token.bin');
+const secretFile = () => dataPath('secret.bin');
+const cacheFile = () => dataPath('events-cache.bin');
 const iconPath = path.join(__dirname, '..', 'build', 'icon.png');
 
 /* ---------- настройки ---------- */
-function loadSettings() {
+function readSecret() {
   try {
-    const raw = JSON.parse(fs.readFileSync(settingsFile(), 'utf8'));
-    settings = { ...DEFAULTS, ...raw };
-  } catch { settings = { ...DEFAULTS }; }
+    if (!safeStorage.isEncryptionAvailable()) return '';
+    return safeStorage.decryptString(fs.readFileSync(secretFile()));
+  } catch { return ''; }
+}
+function writeSecret(value) {
+  try {
+    if (!safeStorage.isEncryptionAvailable()) return false;
+    fs.mkdirSync(app.getPath('userData'), { recursive: true });
+    fs.writeFileSync(secretFile(), safeStorage.encryptString(value));
+    return true;
+  } catch (e) { console.error('secret save failed', e); return false; }
+}
+function loadSettings() {
+  let raw = {};
+  try { raw = JSON.parse(fs.readFileSync(settingsFile(), 'utf8')) || {}; } catch {}
+  const { clientSecret: legacySecret, ...rest } = raw;
+  settings = { ...DEFAULTS, ...rest };
+  if (!settings.rates || typeof settings.rates !== 'object' || Array.isArray(settings.rates)) settings.rates = {};
+  customSecret = readSecret();
+  // миграция: раньше secret лежал в settings.json открытым текстом
+  if (legacySecret && typeof legacySecret === 'string') {
+    if (!customSecret) customSecret = legacySecret;
+    if (!writeSecret(customSecret)) secretPlain = true;
+    saveSettings();
+  }
 }
 function saveSettings() {
   try {
     fs.mkdirSync(app.getPath('userData'), { recursive: true });
-    fs.writeFileSync(settingsFile(), JSON.stringify(settings, null, 2));
+    const out = secretPlain && customSecret ? { ...settings, clientSecret: customSecret } : settings;
+    fs.writeFileSync(settingsFile(), JSON.stringify(out, null, 2));
   } catch (e) { console.error('settings save failed', e); }
 }
 function publicSettings() {
-  const { clientSecret, ...rest } = settings;
-  return { ...rest, hasSecret: !!clientSecret, packaged: app.isPackaged };
+  const { clientId, ...rest } = settings;
+  return { ...rest, customClient: !!clientId, packaged: app.isPackaged };
+}
+// какой OAuth-клиент использовать: свой из старых настроек, иначе вшитый
+function creds() {
+  if (settings.clientId) return { id: settings.clientId, secret: customSecret };
+  return { id: EMBEDDED.clientId, secret: EMBEDDED.clientSecret };
 }
 
 /* ---------- токен ---------- */
@@ -79,10 +120,17 @@ function clearAuth() {
 /* ---------- Google OAuth (loopback + PKCE) ---------- */
 const b64url = buf => buf.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 
+// fetch, который при отсутствии сети бросает ошибку с кодом OFFLINE (тогда виджет покажет кэш)
+async function net(url, opts) {
+  try { return await fetch(url, opts); }
+  catch { const e = new Error('Нет связи с интернетом'); e.code = 'OFFLINE'; throw e; }
+}
+
 async function tokenRequest(extra) {
-  const body = new URLSearchParams({ client_id: settings.clientId, ...extra });
-  if (settings.clientSecret) body.set('client_secret', settings.clientSecret);
-  const r = await fetch('https://oauth2.googleapis.com/token', {
+  const c = creds();
+  const body = new URLSearchParams({ client_id: c.id, ...extra });
+  if (c.secret) body.set('client_secret', c.secret);
+  const r = await net('https://oauth2.googleapis.com/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body
@@ -132,7 +180,6 @@ function startLoopback(expectedState) {
 }
 
 async function login() {
-  if (!settings.clientId) throw new Error('Сначала укажите Client ID в настройках');
   if (loginInProgress) throw new Error('Вход уже выполняется');
   loginInProgress = true;
   try {
@@ -143,7 +190,7 @@ async function login() {
     const { port, result: codePromise, cancel } = await startLoopback(state);
     const redirect = `http://127.0.0.1:${port}`;
     const authUrl = 'https://accounts.google.com/o/oauth2/v2/auth?' + new URLSearchParams({
-      client_id: settings.clientId,
+      client_id: creds().id,
       redirect_uri: redirect,
       response_type: 'code',
       scope: SCOPE,
@@ -177,7 +224,7 @@ async function getAccessToken() {
 
 async function gget(url, retry = true) {
   const token = await getAccessToken();
-  const r = await fetch(url, { headers: { Authorization: 'Bearer ' + token } });
+  const r = await net(url, { headers: { Authorization: 'Bearer ' + token } });
   if (r.status === 401 && retry) { accessToken = null; return gget(url, false); }
   if (!r.ok) throw new Error('Google API: HTTP ' + r.status);
   return r.json();
@@ -217,6 +264,86 @@ async function fetchEvents(timeMin, timeMax) {
     }
   }));
   return out;
+}
+
+/* ---------- офлайн-кэш событий (шифруется так же, как токен) ---------- */
+let cache = { ranges: {} };
+let cacheTimer = null;
+
+function loadCache() {
+  try {
+    if (!safeStorage.isEncryptionAvailable()) return;
+    const c = JSON.parse(safeStorage.decryptString(fs.readFileSync(cacheFile())));
+    if (c && typeof c.ranges === 'object') cache = c;
+  } catch { cache = { ranges: {} }; }
+}
+function saveCacheSoon() {
+  clearTimeout(cacheTimer);
+  cacheTimer = setTimeout(() => {
+    try {
+      if (!safeStorage.isEncryptionAvailable()) return;
+      fs.mkdirSync(app.getPath('userData'), { recursive: true });
+      fs.writeFileSync(cacheFile(), safeStorage.encryptString(JSON.stringify(cache)));
+    } catch (e) { console.error('cache save failed', e); }
+  }, 500);
+}
+function cacheStore(key, events) {
+  cache.ranges[key] = { savedAt: Date.now(), events };
+  const keys = Object.keys(cache.ranges).sort((a, b) => cache.ranges[b].savedAt - cache.ranges[a].savedAt);
+  for (const k of keys.slice(CACHE_RANGES)) delete cache.ranges[k];
+  saveCacheSoon();
+}
+function cacheLookup(key, fromMs, toMs) {
+  const exact = cache.ranges[key];
+  if (exact) return { events: exact.events, savedAt: exact.savedAt };
+  // точного периода нет: собираем из сохранённых то, что попадает в запрошенный диапазон
+  const map = new Map(); let newest = 0;
+  for (const r of Object.values(cache.ranges)) {
+    newest = Math.max(newest, r.savedAt);
+    for (const e of r.events) {
+      const s = Date.parse(e.start), en = Date.parse(e.end);
+      if (en > fromMs && s < toMs) map.set(e.id + '|' + e.start, e);
+    }
+  }
+  return map.size ? { events: [...map.values()], savedAt: newest } : null;
+}
+
+/* ---------- уведомления о сменах ---------- */
+let shiftList = [];            // ближайшие смены от интерфейса: { id, title, start, end } в мс
+let notifyTimers = [];
+const notified = new Set();
+const liveNotes = new Set();   // держим ссылки, иначе клик по уведомлению может потеряться
+
+function setShiftList(list) {
+  shiftList = (Array.isArray(list) ? list : []).slice(0, 200)
+    .filter(e => e && typeof e.id === 'string' && Number.isFinite(e.start))
+    .map(e => ({ id: e.id.slice(0, 200), title: String(e.title || '').slice(0, 120), start: e.start }));
+  rescheduleNotifications();
+}
+function rescheduleNotifications() {
+  notifyTimers.forEach(clearTimeout); notifyTimers = [];
+  if (!settings.notify || !Notification.isSupported()) return;
+  const lead = settings.notifyHours * 3600 * 1000, now = Date.now();
+  for (const ev of shiftList) {
+    if (ev.start <= now || ev.start - now > NOTIFY_HORIZON) continue;
+    const key = `${ev.id}|${ev.start}|${settings.notifyHours}`;
+    if (notified.has(key)) continue;
+    notifyTimers.push(setTimeout(() => fireNotification(ev, key), Math.max(0, ev.start - lead - now)));
+  }
+}
+function fireNotification(ev, key) {
+  if (notified.has(key) || ev.start <= Date.now()) return;
+  notified.add(key);
+  if (notified.size > 500) notified.delete(notified.values().next().value); // не растёт бесконечно
+  const mins = Math.max(1, Math.round((ev.start - Date.now()) / 60000));
+  const left = mins >= 60 ? `${Math.floor(mins / 60)} ч${mins % 60 ? ' ' + (mins % 60) + ' мин' : ''}` : `${mins} мин`;
+  const at = new Date(ev.start).toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' });
+  const n = new Notification({ title: 'Скоро смена: ' + (ev.title || 'без названия'), body: `Начало в ${at}, через ${left}`, icon: iconPath });
+  if (liveNotes.size >= 20) liveNotes.delete(liveNotes.values().next().value);
+  liveNotes.add(n);
+  n.on('click', () => { win?.show(); win?.focus(); });
+  n.on('close', () => liveNotes.delete(n));
+  n.show();
 }
 
 /* ---------- окно ---------- */
@@ -302,29 +429,29 @@ function applyWindowBehavior() {
 
 function updateSettings(patch) {
   const next = { ...settings };
-  let authReset = false;
   if (typeof patch.keywords === 'string') next.keywords = patch.keywords.slice(0, 200);
-  if (typeof patch.clientId === 'string') {
-    const v = patch.clientId.trim().slice(0, 300);
-    if (v !== next.clientId) authReset = true;
-    next.clientId = v;
-  }
-  if (typeof patch.clientSecret === 'string') {
-    const v = patch.clientSecret.trim().slice(0, 300);
-    if (v !== next.clientSecret) authReset = true;
-    next.clientSecret = v;
-  }
-  for (const k of ['autostart', 'alwaysOnTop', 'locked', 'onlyMine']) {
+  for (const k of ['autostart', 'alwaysOnTop', 'locked', 'onlyMine', 'notify']) {
     if (typeof patch[k] === 'boolean') next[k] = patch[k];
   }
   if (typeof patch.opacity === 'number' && isFinite(patch.opacity)) {
     next.opacity = Math.min(1, Math.max(0.4, patch.opacity));
   }
+  if (typeof patch.notifyHours === 'number' && isFinite(patch.notifyHours)) {
+    next.notifyHours = Math.min(48, Math.max(1, Math.round(patch.notifyHours)));
+  }
+  if (patch.rates && typeof patch.rates === 'object' && !Array.isArray(patch.rates)) {
+    const rates = {};
+    for (const [k, v] of Object.entries(patch.rates).slice(0, 50)) {
+      const n = Math.round(Number(v));
+      if (/^(#[0-9a-f]{3,8}|none)$/i.test(k) && isFinite(n) && n > 0 && n <= 1e9) rates[k.toLowerCase()] = n;
+    }
+    next.rates = rates;
+  }
   settings = next;
   saveSettings();
-  if (authReset) clearAuth();
   applyAutostart();
   applyWindowBehavior();
+  rescheduleNotifications();
   refreshTray();
   send('settings:changed', publicSettings());
 }
@@ -392,12 +519,24 @@ function registerIpc() {
     try {
       const from = new Date(range?.from), to = new Date(range?.to);
       if (isNaN(from) || isNaN(to) || to - from > 1000 * 3600 * 24 * 200) throw new Error('Некорректный период');
-      const events = await fetchEvents(from.toISOString(), to.toISOString());
-      return { ok: true, events };
+      const key = from.toISOString() + '|' + to.toISOString();
+      try {
+        const events = await fetchEvents(from.toISOString(), to.toISOString());
+        cacheStore(key, events);
+        return { ok: true, events, savedAt: Date.now() };
+      } catch (e) {
+        // нет сети: показываем последние сохранённые данные
+        if (e.code === 'OFFLINE' && refreshToken) {
+          const c = cacheLookup(key, from.getTime(), to.getTime());
+          if (c) return { ok: true, offline: true, events: c.events, savedAt: c.savedAt };
+        }
+        throw e;
+      }
     } catch (e) {
       return { ok: false, code: e.code || 'ERR', message: e.message || String(e) };
     }
   });
+  ipcMain.on('notify:shifts', (_e, list) => setShiftList(list));
   ipcMain.handle('sys:accent', () => accentHex());
   ipcMain.on('window:hide', () => win?.hide());
   ipcMain.on('window:fit', (_e, h) => {
@@ -420,6 +559,7 @@ if (!app.requestSingleInstanceLock()) {
   app.whenReady().then(() => {
     loadSettings();
     loadRefreshToken();
+    loadCache();
     registerIpc();
     createWindow();
     createTray();
