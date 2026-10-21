@@ -39,17 +39,22 @@ function plural(n, one, few, many) {
   return many;
 }
 
-function isShift(title) {
-  const keys = (settings?.keywords || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
-  if (!keys.length) return true; // список слов пуст: все события считаются сменами
-  const t = title.toLowerCase();
+// у студии может быть своё имя (если там вас записывают иначе), иначе действуют общие слова из «Что считать сменой»
+const studioName = color => ((settings?.studioNames || {})[rateKey(color)] || '').trim();
+const hasAnyNames = () => (settings?.keywords || '').trim() !== '' || Object.values(settings?.studioNames || {}).some(v => String(v).trim());
+function isShift(title, color) {
+  const own = studioName(color);
+  const src = own || settings?.keywords || '';
+  const keys = src.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+  // слов нет вообще: все события считаются сменами; слова есть только у других студий: здесь ничего не моё
+  if (!keys.length) return !Object.values(settings?.studioNames || {}).some(v => String(v).trim());
+  const t = String(title).toLowerCase();
   return keys.some(k => t.includes(k));
 }
 
 function visibleEvents(key) {
   const list = events[key] || [];
-  const hasKeys = (settings?.keywords || '').trim() !== '';
-  return settings?.onlyMine && hasKeys ? list.filter(e => e.shift) : list;
+  return settings?.onlyMine && hasAnyNames() ? list.filter(e => e.shift) : list;
 }
 
 /* ---------- данные ---------- */
@@ -57,7 +62,7 @@ function parseEv(raw) {
   let start, end;
   if (raw.allDay) { start = localDate(raw.start); end = localDate(raw.end); }
   else { start = new Date(raw.start); end = new Date(raw.end); }
-  return { ...raw, start, end, shift: isShift(raw.title) };
+  return { ...raw, start, end, shift: isShift(raw.title, raw.color) };
 }
 
 function indexEvents(list) {
@@ -279,13 +284,14 @@ function applySettings(s) {
   if (document.activeElement !== $('fNotifyH')) $('fNotifyH').value = s.notifyHours;
   if (document.activeElement !== $('fNotifyEve')) $('fNotifyEve').value = s.notifyEve || '20:00';
   // ключевые слова могли поменяться — пересобрать подсветку из уже загруженных данных
-  if (s.keywords !== lastKeys) {
-    lastKeys = s.keywords;
+  const namesSig = s.keywords + '|' + JSON.stringify(s.studioNames || {});
+  if (namesSig !== lastKeys) {
+    lastKeys = namesSig;
     const flat = new Map();
     Object.values(events).flat().forEach(e => flat.set(e.id + '|' + e.start.getTime(), e));
     const raw = [...flat.values()].map(e => ({ ...e, start: e.allDay ? ymd(e.start) : e.start.toISOString(), end: e.allDay ? ymd(e.end) : e.end.toISOString() }));
     events = indexEvents(raw);
-    upcoming = upcoming.map(e => ({ ...e, shift: isShift(e.title) }));
+    upcoming = upcoming.map(e => ({ ...e, shift: isShift(e.title, e.color) }));
   }
   updateButtons();
   renderRates();
@@ -299,26 +305,26 @@ function studiosList() {
   const info = new Map();
   const add = e => {
     const k = rateKey(e.color);
-    const it = info.get(k) || { key: k, color: e.color || '', titles: new Map() };
-    it.titles.set(e.title, (it.titles.get(e.title) || 0) + 1);
+    const it = info.get(k) || { key: k, color: e.color || '', names: new Map() };
+    const nm = e.calendar || e.title;
+    it.names.set(nm, (it.names.get(nm) || 0) + 1);
     info.set(k, it);
   };
   if (!demo) {
     const seen = new Set();
     for (const e of Object.values(events).flat()) {
       const id = e.id + '|' + e.start.getTime();
-      if (e.shift && !seen.has(id)) { seen.add(id); add(e); }
+      if (!seen.has(id)) { seen.add(id); add(e); }
     }
   }
-  for (const k of Object.keys(settings?.rates || {})) {
-    if (!info.has(k)) info.set(k, { key: k, color: k === 'none' ? '' : k, titles: new Map() });
+  for (const k of [...Object.keys(settings?.rates || {}), ...Object.keys(settings?.studioNames || {})]) {
+    if (!info.has(k)) info.set(k, { key: k, color: k === 'none' ? '' : k, names: new Map() });
   }
   return [...info.values()].map(it => {
-    const top = [...it.titles.entries()].sort((a, b) => b[1] - a[1])[0];
+    const top = [...it.names.entries()].sort((a, b) => b[1] - a[1])[0];
     return { key: it.key, color: it.color, name: top ? top[0] : (it.color ? 'Студия ' + it.color : 'Без цвета') };
   }).sort((a, b) => a.name.localeCompare(b.name, 'ru'));
 }
-
 function renderRates() {
   const box = $('rates');
   if (box.contains(document.activeElement)) return; // не перерисовывать, пока человек вводит сумму
@@ -326,10 +332,11 @@ function renderRates() {
   $('ratesEmpty').hidden = list.length > 0;
   box.textContent = '';
   for (const st of list) {
+    const wrap = document.createElement('div'); wrap.className = 'studio';
     const row = document.createElement('div'); row.className = 'rate';
     const label = document.createElement('label'); label.className = 'nm';
     const dot = document.createElement('b'); if (st.color) dot.style.background = st.color;
-    const name = document.createElement('span'); name.textContent = st.name;
+    const name = document.createElement('span'); name.textContent = st.name; name.title = st.name;
     const input = document.createElement('input');
     input.type = 'number'; input.min = '0'; input.step = '500'; input.inputMode = 'numeric';
     input.placeholder = '0'; input.dataset.k = st.key;
@@ -338,7 +345,17 @@ function renderRates() {
     label.htmlFor = input.id; label.append(dot, name);
     const cur = document.createElement('span'); cur.className = 'cur'; cur.textContent = '₸';
     row.append(label, input, cur);
-    box.append(row);
+    // моё имя именно в этой студии
+    const row2 = document.createElement('div'); row2.className = 'rate sub';
+    const l2 = document.createElement('label'); l2.className = 'nm'; l2.textContent = 'Моё имя здесь';
+    const nameIn = document.createElement('input');
+    nameIn.type = 'text'; nameIn.spellcheck = false; nameIn.dataset.sk = st.key; nameIn.maxLength = 200;
+    nameIn.placeholder = (settings?.keywords || '').trim() || 'как в поле выше';
+    nameIn.id = 'sname-' + st.key.replace(/[^a-z0-9]/gi, ''); l2.htmlFor = nameIn.id;
+    nameIn.value = settings?.studioNames?.[st.key] || '';
+    row2.append(l2, nameIn);
+    wrap.append(row, row2);
+    box.append(wrap);
   }
 }
 
@@ -363,12 +380,16 @@ let ratesTimer;
 $('rates').addEventListener('input', () => {
   clearTimeout(ratesTimer);
   ratesTimer = setTimeout(() => {
-    const rates = {};
-    $('rates').querySelectorAll('input').forEach(i => { const n = Number(i.value); if (n > 0) rates[i.dataset.k] = n; });
-    // ставки студий, которых сейчас нет на экране, не теряем
-    const shown = new Set([...$('rates').querySelectorAll('input')].map(i => i.dataset.k));
+    const rates = {}, studioNames = {};
+    const rateIn = [...$('rates').querySelectorAll('input[data-k]')];
+    const nameIn = [...$('rates').querySelectorAll('input[data-sk]')];
+    rateIn.forEach(i => { const n = Number(i.value); if (n > 0) rates[i.dataset.k] = n; });
+    nameIn.forEach(i => { if (i.value.trim()) studioNames[i.dataset.sk] = i.value.trim(); });
+    // студии, которых сейчас нет на экране, не теряем
+    const shown = new Set(rateIn.map(i => i.dataset.k));
     for (const [k, v] of Object.entries(settings?.rates || {})) if (!shown.has(k)) rates[k] = v;
-    api.setSettings({ rates });
+    for (const [k, v] of Object.entries(settings?.studioNames || {})) if (!shown.has(k)) studioNames[k] = v;
+    api.setSettings({ rates, studioNames });
   }, 400);
 });
 
@@ -388,9 +409,9 @@ function updateNext(pushToMain) {
   shifts.sort((a, b) => a.start - b.start);
   if (pushToMain) {
     // смены на весь день уведомляют накануне вечером; без слов в «Что считать сменой» «сменой» считается всё подряд, поэтому их не шлём
-    const hasKeys = (settings?.keywords || '').trim() !== '';
+    const hasKeys = hasAnyNames();
     api.setShifts(shifts.filter(e => e.start > now && (!e.allDay || hasKeys)).slice(0, 100)
-      .map(e => ({ id: e.id, title: e.title, start: e.start.getTime(), allDay: !!e.allDay })));
+      .map(e => ({ id: e.id, title: e.title, start: e.start.getTime(), allDay: !!e.allDay, calendar: e.calendar || '' })));
   }
 }
 
@@ -458,7 +479,7 @@ $('fOpacity').addEventListener('input', () => api.setSettings({ opacity: Number(
 $('tAuto').onchange = () => api.setSettings({ autostart: $('tAuto').checked });
 $('segAll').onclick = () => api.setSettings({ onlyMine: false });
 $('segMine').onclick = () => {
-  if (!(settings?.keywords || '').trim()) { openPanel(); $('fKeys').focus(); return; }
+  if (!hasAnyNames()) { openPanel(); $('fKeys').focus(); return; }
   api.setSettings({ onlyMine: true });
 };
 $('tOnly').onchange = () => api.setSettings({ onlyMine: $('tOnly').checked });

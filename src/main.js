@@ -34,6 +34,7 @@ const DEFAULTS = {
   notifyEve: '20:00', // для смен «на весь день»: во сколько напомнить накануне
   notifyHours: 2,  // за сколько часов
   dayPay: {},      // сумма за конкретный день и студию: { '2026-10-22|#0b8043': 12000 }, заменяет ставку по умолчанию
+  studioNames: {}, // моё имя в конкретной студии: { '#0b8043': 'вова, владимир' }, заменяет общие слова для этой студии
   rates: {},       // ставка за смену по студиям: { '#0b8043': 25000 }, ключ = цвет метки
   bounds: null
 };
@@ -79,6 +80,7 @@ function loadSettings() {
   const { clientSecret: legacySecret, ...rest } = raw;
   settings = { ...DEFAULTS, ...rest };
   if (!settings.rates || typeof settings.rates !== 'object' || Array.isArray(settings.rates)) settings.rates = {};
+  if (!settings.studioNames || typeof settings.studioNames !== 'object' || Array.isArray(settings.studioNames)) settings.studioNames = {};
   if (!settings.dayPay || typeof settings.dayPay !== 'object' || Array.isArray(settings.dayPay)) settings.dayPay = {};
   customSecret = readSecret();
   // миграция: раньше secret лежал в settings.json открытым текстом
@@ -326,7 +328,7 @@ const liveNotes = new Set();   // держим ссылки, иначе клик
 function setShiftList(list) {
   shiftList = (Array.isArray(list) ? list : []).slice(0, 200)
     .filter(e => e && typeof e.id === 'string' && Number.isFinite(e.start))
-    .map(e => ({ id: e.id.slice(0, 200), title: String(e.title || '').slice(0, 120), start: e.start, allDay: e.allDay === true }));
+    .map(e => ({ id: e.id.slice(0, 200), title: String(e.title || '').slice(0, 120), start: e.start, allDay: e.allDay === true, calendar: String(e.calendar || '').slice(0, 120) }));
   rescheduleNotifications();
 }
 function rescheduleNotifications() {
@@ -351,7 +353,7 @@ function fireNotification(ev, key) {
   if (notified.has(key) || ev.start <= Date.now()) return;
   notified.add(key);
   if (notified.size > 500) notified.delete(notified.values().next().value); // не растёт бесконечно
-  if (ev.allDay) return showNote('Завтра смена: ' + (ev.title || 'без названия'), 'Смена на весь день');
+  if (ev.allDay) return showNote('Завтра смена' + (ev.calendar ? ' в ' + ev.calendar : ''), 'Прекрасного дня!');
   const mins = Math.max(1, Math.round((ev.start - Date.now()) / 60000));
   const left = mins >= 60 ? `${Math.floor(mins / 60)} ч${mins % 60 ? ' ' + (mins % 60) + ' мин' : ''}` : `${mins} мин`;
   const at = new Date(ev.start).toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' });
@@ -537,6 +539,13 @@ function updateSettings(patch) {
     next.notifyHours = Math.min(48, Math.max(1, Math.round(patch.notifyHours)));
   }
   if (typeof patch.notifyEve === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(patch.notifyEve)) next.notifyEve = patch.notifyEve;
+  if (patch.studioNames && typeof patch.studioNames === 'object' && !Array.isArray(patch.studioNames)) {
+    const names = [];
+    for (const [k, v] of Object.entries(patch.studioNames).slice(0, 50)) {
+      if (/^(#[0-9a-f]{3,8}|none)$/i.test(k) && typeof v === 'string' && v.trim()) names.push([k.toLowerCase(), v.trim().slice(0, 200)]);
+    }
+    next.studioNames = Object.fromEntries(names);
+  }
   if (patch.rates && typeof patch.rates === 'object' && !Array.isArray(patch.rates)) {
     const rates = {};
     for (const [k, v] of Object.entries(patch.rates).slice(0, 50)) {
@@ -647,7 +656,7 @@ function registerIpc() {
   ipcMain.on('notify:shifts', (_e, list) => setShiftList(list));
   ipcMain.handle('notify:test', () => {
     if (!Notification.isSupported()) return { ok: false, message: 'Уведомления не поддерживаются в этой системе' };
-    showNote('Скоро смена: проверка', 'Если вы видите это, уведомления работают');
+    showNote('Завтра смена в ВауФото', 'Прекрасного дня!');
     return { ok: true };
   });
   ipcMain.handle('update:state', () => updater.getState());

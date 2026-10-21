@@ -202,3 +202,9 @@ input[type=time]::-webkit-calendar-picker-indicator { filter: invert(.6); cursor
 .panel .chip:not(.primary):hover { background: color-mix(in srgb, var(--accent) 22%, var(--hover)); border-color: color-mix(in srgb, var(--accent) 60%, transparent); }
 .panel .chip:not(.primary):active { background: color-mix(in srgb, var(--accent) 32%, var(--hover)); }
 .panel .chip:disabled { opacity: .5; }
+
+/* студия: ставка и своё имя */
+.studio { padding: 6px 0 10px; border-bottom: 1px solid var(--line); }
+.studio .rate { margin-top: 6px; }
+.rate.sub .nm { color: var(--muted); font-size: 12px; flex: none; }
+.rate.sub input[type=text] { flex: 1; min-width: 0; }
