@@ -71,7 +71,7 @@
     <p class="hint" id="devNote" hidden>Автозапуск работает только в установленной версии (после npm run dist).</p>
 
     <h3 class="sect">Заработок</h3>
-    <p class="hint">Ставка по умолчанию за одну смену в тенге, отдельно для каждой студии. Если в какой-то день вы заработали другую сумму, впишите её в карточке смены этого дня: она заменит ставку. Считаются только ваши смены; сумма за месяц стоит справа от даты. Если в какой-то студии вас записывают под другим именем, впишите его в поле «Моё имя здесь»: для этой студии оно заменит слова из поля «Что считать сменой».</p>
+    <p class="hint">Ставка по умолчанию за одну смену в тенге, отдельно для каждой студии. Если в какой-то день вы заработали другую сумму, впишите её в карточке смены этого дня: она заменит ставку. Считаются только ваши смены; сумма за месяц стоит справа от даты. Под названием студии показано ваше имя из поля «Что считать сменой».</p>
     <div id="rates"></div>
     <p class="hint" id="ratesEmpty">Студии появятся после первой синхронизации с календарём.</p>
     <div class="row"><button class="chip" id="btnClearPay" type="button">Очистить заработок</button></div>
@@ -81,12 +81,11 @@
     <div class="toggle"><span>Напоминать о смене (уведомление Windows)</span><label class="sw"><input type="checkbox" id="tNotify"><b></b></label></div>
     <div class="rate">
       <label class="nm" for="fNotifyH">За сколько часов до начала</label>
-      <input id="fNotifyH" type="number" min="1" max="48" step="1" inputmode="numeric">
-      <span class="cur">ч</span>
+      <span class="fld"><input id="fNotifyH" type="number" min="1" max="48" step="1" inputmode="numeric"><i class="suf">ч</i></span>
     </div>
     <div class="rate">
       <label class="nm" for="fNotifyEve">Накануне, для смен «на весь день»</label>
-      <input id="fNotifyEve" type="time">
+      <span class="fld"><input id="fNotifyEve" type="time"></span>
     </div>
     <p class="hint">Нужны слова в поле «Что считать сменой», иначе напоминания не приходят.</p>
     <div class="row"><button class="chip" id="btnNotifyTest" type="button">Уведомить сейчас</button><span class="hint" id="notifyMsg" style="margin:0;align-self:center"></span></div>

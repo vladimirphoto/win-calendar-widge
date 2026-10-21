@@ -170,8 +170,6 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
 .rate .nm { flex: 1; min-width: 0; margin: 0; display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rate .nm b { width: 10px; height: 10px; border-radius: 50%; flex: none; background: var(--muted); }
 .rate .nm span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.rate input[type=number] { width: 110px; flex: none; text-align: right; }
-.rate .cur { color: var(--muted); font-size: 13px; width: 14px; }
 
 /* удаление данных */
 .chip.danger { color: #d13438; border-color: color-mix(in srgb, #d13438 45%, transparent); }
@@ -194,7 +192,6 @@ button:disabled { opacity: .55; }
 .status.login span { cursor: pointer; text-decoration: underline dotted; text-underline-offset: 3px; }
 
 .ib svg.gear { width: 17px; height: 17px; stroke-width: 1.7; }
-.rate input[type=time] { width: 110px; flex: none; text-align: right; }
 input[type=time]::-webkit-calendar-picker-indicator { filter: invert(.6); cursor: pointer; }
 
 /* кнопки в настройках: всегда видны как кнопки, при наведении подсвечиваются акцентом */
@@ -203,8 +200,18 @@ input[type=time]::-webkit-calendar-picker-indicator { filter: invert(.6); cursor
 .panel .chip:not(.primary):active { background: color-mix(in srgb, var(--accent) 32%, var(--hover)); }
 .panel .chip:disabled { opacity: .5; }
 
-/* студия: ставка и своё имя */
-.studio { padding: 6px 0 10px; border-bottom: 1px solid var(--line); }
-.studio .rate { margin-top: 6px; }
-.rate.sub .nm { color: var(--muted); font-size: 12px; flex: none; }
-.rate.sub input[type=text] { flex: 1; min-width: 0; }
+/* поле с подписью-единицей внутри («ч», «₸»); все такие поля одной ширины и выровнены по правому краю */
+.fld { position: relative; display: block; flex: none; width: 110px; }
+.fld input { width: 100%; text-align: right; }
+.fld input[type=number] { padding-right: 28px; -moz-appearance: textfield; appearance: textfield; }
+.fld input[type=number]::-webkit-outer-spin-button, .fld input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.fld .suf { position: absolute; right: 11px; top: 50%; transform: translateY(-50%); color: var(--muted); font-style: normal; font-size: 13px; pointer-events: none; }
+
+/* студия: название, под ним ваше имя; справа ставка */
+.studio { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--line); }
+.studio .nm { flex: 1; min-width: 0; margin: 0; display: flex; align-items: center; gap: 9px; color: var(--text); font-size: 13px; }
+.studio .nm b { width: 10px; height: 10px; border-radius: 50%; flex: none; background: var(--muted); }
+.studio .txt { display: flex; flex-direction: column; min-width: 0; gap: 1px; }
+.studio .sn { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.studio .who { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.studio .fld { width: 92px; }

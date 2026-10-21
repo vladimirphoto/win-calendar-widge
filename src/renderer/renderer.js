@@ -39,15 +39,10 @@ function plural(n, one, few, many) {
   return many;
 }
 
-// у студии может быть своё имя (если там вас записывают иначе), иначе действуют общие слова из «Что считать сменой»
-const studioName = color => ((settings?.studioNames || {})[rateKey(color)] || '').trim();
-const hasAnyNames = () => (settings?.keywords || '').trim() !== '' || Object.values(settings?.studioNames || {}).some(v => String(v).trim());
-function isShift(title, color) {
-  const own = studioName(color);
-  const src = own || settings?.keywords || '';
-  const keys = src.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
-  // слов нет вообще: все события считаются сменами; слова есть только у других студий: здесь ничего не моё
-  if (!keys.length) return !Object.values(settings?.studioNames || {}).some(v => String(v).trim());
+const hasAnyNames = () => (settings?.keywords || '').trim() !== '';
+function isShift(title) {
+  const keys = (settings?.keywords || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+  if (!keys.length) return true; // слов нет: все события считаются сменами
   const t = String(title).toLowerCase();
   return keys.some(k => t.includes(k));
 }
@@ -62,7 +57,7 @@ function parseEv(raw) {
   let start, end;
   if (raw.allDay) { start = localDate(raw.start); end = localDate(raw.end); }
   else { start = new Date(raw.start); end = new Date(raw.end); }
-  return { ...raw, start, end, shift: isShift(raw.title, raw.color) };
+  return { ...raw, start, end, shift: isShift(raw.title) };
 }
 
 function indexEvents(list) {
@@ -284,14 +279,14 @@ function applySettings(s) {
   if (document.activeElement !== $('fNotifyH')) $('fNotifyH').value = s.notifyHours;
   if (document.activeElement !== $('fNotifyEve')) $('fNotifyEve').value = s.notifyEve || '20:00';
   // ключевые слова могли поменяться — пересобрать подсветку из уже загруженных данных
-  const namesSig = s.keywords + '|' + JSON.stringify(s.studioNames || {});
+  const namesSig = s.keywords;
   if (namesSig !== lastKeys) {
     lastKeys = namesSig;
     const flat = new Map();
     Object.values(events).flat().forEach(e => flat.set(e.id + '|' + e.start.getTime(), e));
     const raw = [...flat.values()].map(e => ({ ...e, start: e.allDay ? ymd(e.start) : e.start.toISOString(), end: e.allDay ? ymd(e.end) : e.end.toISOString() }));
     events = indexEvents(raw);
-    upcoming = upcoming.map(e => ({ ...e, shift: isShift(e.title, e.color) }));
+    upcoming = upcoming.map(e => ({ ...e, shift: isShift(e.title) }));
   }
   updateButtons();
   renderRates();
@@ -317,7 +312,7 @@ function studiosList() {
       if (!seen.has(id)) { seen.add(id); add(e); }
     }
   }
-  for (const k of [...Object.keys(settings?.rates || {}), ...Object.keys(settings?.studioNames || {})]) {
+  for (const k of Object.keys(settings?.rates || {})) {
     if (!info.has(k)) info.set(k, { key: k, color: k === 'none' ? '' : k, names: new Map() });
   }
   return [...info.values()].map(it => {
@@ -331,31 +326,26 @@ function renderRates() {
   const list = studiosList();
   $('ratesEmpty').hidden = list.length > 0;
   box.textContent = '';
+  const mine = (settings?.keywords || '').trim(); // ваше имя из поля «Что считать сменой»
   for (const st of list) {
-    const wrap = document.createElement('div'); wrap.className = 'studio';
-    const row = document.createElement('div'); row.className = 'rate';
+    const row = document.createElement('div'); row.className = 'studio';
     const label = document.createElement('label'); label.className = 'nm';
     const dot = document.createElement('b'); if (st.color) dot.style.background = st.color;
-    const name = document.createElement('span'); name.textContent = st.name; name.title = st.name;
+    const text = document.createElement('div'); text.className = 'txt';
+    const name = document.createElement('span'); name.className = 'sn'; name.textContent = st.name; name.title = st.name;
+    text.append(name);
+    if (mine) { const who = document.createElement('span'); who.className = 'who'; who.textContent = mine; text.append(who); }
     const input = document.createElement('input');
     input.type = 'number'; input.min = '0'; input.step = '500'; input.inputMode = 'numeric';
     input.placeholder = '0'; input.dataset.k = st.key;
     input.id = 'rate-' + st.key.replace(/[^a-z0-9]/gi, '');
     const v = settings?.rates?.[st.key]; if (v) input.value = String(v);
-    label.htmlFor = input.id; label.append(dot, name);
-    const cur = document.createElement('span'); cur.className = 'cur'; cur.textContent = '₸';
-    row.append(label, input, cur);
-    // моё имя именно в этой студии
-    const row2 = document.createElement('div'); row2.className = 'rate sub';
-    const l2 = document.createElement('label'); l2.className = 'nm'; l2.textContent = 'Моё имя здесь';
-    const nameIn = document.createElement('input');
-    nameIn.type = 'text'; nameIn.spellcheck = false; nameIn.dataset.sk = st.key; nameIn.maxLength = 200;
-    nameIn.placeholder = (settings?.keywords || '').trim() || 'как в поле выше';
-    nameIn.id = 'sname-' + st.key.replace(/[^a-z0-9]/gi, ''); l2.htmlFor = nameIn.id;
-    nameIn.value = settings?.studioNames?.[st.key] || '';
-    row2.append(l2, nameIn);
-    wrap.append(row, row2);
-    box.append(wrap);
+    label.htmlFor = input.id; label.append(dot, text);
+    const fld = document.createElement('span'); fld.className = 'fld';
+    const suf = document.createElement('i'); suf.className = 'suf'; suf.textContent = '₸';
+    fld.append(input, suf);
+    row.append(label, fld);
+    box.append(row);
   }
 }
 
@@ -380,16 +370,13 @@ let ratesTimer;
 $('rates').addEventListener('input', () => {
   clearTimeout(ratesTimer);
   ratesTimer = setTimeout(() => {
-    const rates = {}, studioNames = {};
+    const rates = {};
     const rateIn = [...$('rates').querySelectorAll('input[data-k]')];
-    const nameIn = [...$('rates').querySelectorAll('input[data-sk]')];
     rateIn.forEach(i => { const n = Number(i.value); if (n > 0) rates[i.dataset.k] = n; });
-    nameIn.forEach(i => { if (i.value.trim()) studioNames[i.dataset.sk] = i.value.trim(); });
     // студии, которых сейчас нет на экране, не теряем
     const shown = new Set(rateIn.map(i => i.dataset.k));
     for (const [k, v] of Object.entries(settings?.rates || {})) if (!shown.has(k)) rates[k] = v;
-    for (const [k, v] of Object.entries(settings?.studioNames || {})) if (!shown.has(k)) studioNames[k] = v;
-    api.setSettings({ rates, studioNames });
+    api.setSettings({ rates });
   }, 400);
 });
 

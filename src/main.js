@@ -12,7 +12,8 @@ const EMBEDDED = require('./google-client');
 const { createUpdater } = require('./updater');
 const UPDATE_CFG = require('./update-config');
 
-const APP_ID = 'local.win.calendar.widget';
+// Windows показывает этот идентификатор как название программы в заголовке уведомлений
+const APP_ID = 'Календарь';
 const SCOPE = 'https://www.googleapis.com/auth/calendar.readonly';
 const WIN_W = 420;
 const WIN_H = 660;
@@ -34,7 +35,6 @@ const DEFAULTS = {
   notifyEve: '20:00', // для смен «на весь день»: во сколько напомнить накануне
   notifyHours: 2,  // за сколько часов
   dayPay: {},      // сумма за конкретный день и студию: { '2026-10-22|#0b8043': 12000 }, заменяет ставку по умолчанию
-  studioNames: {}, // моё имя в конкретной студии: { '#0b8043': 'вова, владимир' }, заменяет общие слова для этой студии
   rates: {},       // ставка за смену по студиям: { '#0b8043': 25000 }, ключ = цвет метки
   bounds: null
 };
@@ -80,7 +80,7 @@ function loadSettings() {
   const { clientSecret: legacySecret, ...rest } = raw;
   settings = { ...DEFAULTS, ...rest };
   if (!settings.rates || typeof settings.rates !== 'object' || Array.isArray(settings.rates)) settings.rates = {};
-  if (!settings.studioNames || typeof settings.studioNames !== 'object' || Array.isArray(settings.studioNames)) settings.studioNames = {};
+  delete settings.studioNames; // убрано: имя задаётся одним полем «Что считать сменой»
   if (!settings.dayPay || typeof settings.dayPay !== 'object' || Array.isArray(settings.dayPay)) settings.dayPay = {};
   customSecret = readSecret();
   // миграция: раньше secret лежал в settings.json открытым текстом
@@ -539,13 +539,6 @@ function updateSettings(patch) {
     next.notifyHours = Math.min(48, Math.max(1, Math.round(patch.notifyHours)));
   }
   if (typeof patch.notifyEve === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(patch.notifyEve)) next.notifyEve = patch.notifyEve;
-  if (patch.studioNames && typeof patch.studioNames === 'object' && !Array.isArray(patch.studioNames)) {
-    const names = [];
-    for (const [k, v] of Object.entries(patch.studioNames).slice(0, 50)) {
-      if (/^(#[0-9a-f]{3,8}|none)$/i.test(k) && typeof v === 'string' && v.trim()) names.push([k.toLowerCase(), v.trim().slice(0, 200)]);
-    }
-    next.studioNames = Object.fromEntries(names);
-  }
   if (patch.rates && typeof patch.rates === 'object' && !Array.isArray(patch.rates)) {
     const rates = {};
     for (const [k, v] of Object.entries(patch.rates).slice(0, 50)) {
