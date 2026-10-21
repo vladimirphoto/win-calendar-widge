@@ -37,6 +37,7 @@ const DEFAULTS = {
   notifyHours: 2,  // за сколько часов
   dayPay: {},      // сумма за конкретный день и студию: { '2026-10-22|#0b8043': 12000 }, заменяет ставку по умолчанию
   rates: {},       // ставка за смену по студиям: { '#0b8043': 25000 }, ключ = цвет метки
+  payPeriod: 'month', // за какой период показывать заработок: 'month' весь месяц | 'first' 1–15 | 'second' 16–конец
   theme: 'system', // 'system' | 'light' | 'dark' | 'glass'
   glassBlur: 20,   // размытие обоев под «Стеклом», px
   bounds: null
@@ -102,6 +103,7 @@ function loadSettings() {
   const { clientSecret: legacySecret, ...rest } = raw;
   settings = { ...DEFAULTS, ...rest };
   if (!settings.rates || typeof settings.rates !== 'object' || Array.isArray(settings.rates)) settings.rates = {};
+  if (!['month', 'first', 'second'].includes(settings.payPeriod)) settings.payPeriod = 'month';
   delete settings.scale; // убрано: размер виджета не настраивается
   delete settings.studioNames; // убрано: имя задаётся одним полем «Что считать сменой»
   if (!settings.dayPay || typeof settings.dayPay !== 'object' || Array.isArray(settings.dayPay)) settings.dayPay = {};
@@ -615,6 +617,7 @@ function updateSettings(patch) {
     next.notifyHours = Math.min(48, Math.max(1, Math.round(patch.notifyHours)));
   }
   if (['system', 'light', 'dark', 'glass'].includes(patch.theme)) next.theme = patch.theme;
+  if (['month', 'first', 'second'].includes(patch.payPeriod)) next.payPeriod = patch.payPeriod;
   if (typeof patch.glassBlur === 'number' && isFinite(patch.glassBlur)) next.glassBlur = Math.min(40, Math.max(0, Math.round(patch.glassBlur)));
   if (typeof patch.notifyEve === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(patch.notifyEve)) next.notifyEve = patch.notifyEve;
   if (patch.rates && typeof patch.rates === 'object' && !Array.isArray(patch.rates)) {

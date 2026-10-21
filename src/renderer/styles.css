@@ -254,6 +254,7 @@ input[type=time]::-webkit-calendar-picker-indicator { filter: invert(.6); cursor
 .seg3[data-pos="1"] .thumb { transform: translateX(100%); }
 .seg3[data-pos="2"] .thumb { transform: translateX(200%); }
 .seg3 button { padding: 4px 9px; display: grid; place-items: center; }
+.seg-txt button { padding: 6px 8px; white-space: nowrap; }
 .seg3 button svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 
 /* ---- тема «Стекло» (в духе iOS): размытые обои, светящийся ободок, скруглённая карточка с тенью, как в светлой и тёмной ---- */

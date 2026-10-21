@@ -91,6 +91,16 @@
     <p class="hint" id="devNote" hidden>Автозапуск работает только в установленной версии (после npm run dist).</p>
 
     <h3 class="sect">Заработок</h3>
+    <div class="field">
+      <label>Показывать заработок за</label>
+      <div class="seg seg3 seg-txt" id="paySeg" data-pos="0" role="group" aria-label="Период заработка">
+        <i class="thumb" aria-hidden="true"></i>
+        <button type="button" data-period="month">Весь месяц</button>
+        <button type="button" data-period="first">1–15</button>
+        <button type="button" data-period="second">16–конец</button>
+      </div>
+      <p class="hint">Зарплата приходит 1-го и 15-го: «1–15» показывает сумму за смены с 1 по 15 число, «16–конец» за остальные дни месяца. Сумма стоит справа от даты.</p>
+    </div>
     <p class="hint">Ставка по умолчанию за одну смену в тенге, отдельно для каждой студии. Если в какой-то день вы заработали другую сумму, впишите её в карточке смены этого дня: она заменит ставку. Считаются только ваши смены; сумма за месяц стоит справа от даты. Под названием студии показано ваше имя из поля «Что считать сменой».</p>
     <div id="rates"></div>
     <p class="hint" id="ratesEmpty">Студии появятся после первой синхронизации с календарём.</p>

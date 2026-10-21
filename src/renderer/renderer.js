@@ -212,12 +212,18 @@ function monthShifts() {
   return out;
 }
 
+const PAY_POS = { month: 0, first: 1, second: 2 };
+const payPeriod = () => (settings?.payPeriod in PAY_POS ? settings.payPeriod : 'month');
+
 function updateEarn() {
-  const list = monthShifts();
+  const period = payPeriod();
+  const list = monthShifts().filter(e => period === 'month' || (period === 'first') === (e.start.getDate() <= 15));
   const earn = list.reduce((sum, e) => sum + payFor(e), 0);
   const earnEl = $('earn');
   const showEarn = list.length > 0 && earn > 0;
-  if (showEarn) earnEl.textContent = 'Заработок: ' + money(earn);
+  const lastDay = new Date(view.getFullYear(), view.getMonth() + 1, 0).getDate();
+  const label = period === 'first' ? 'Заработок 1–15' : period === 'second' ? `Заработок 16–${lastDay}` : 'Заработок';
+  if (showEarn) earnEl.textContent = label + ': ' + money(earn);
   if (earnEl.hidden === showEarn) earnEl.hidden = !showEarn;
 }
 
@@ -313,6 +319,19 @@ api.onGlassGeometry(g => {
 });
 setInterval(() => { if (effectiveTheme(settings) === 'glass' && !document.hidden) refreshGlass(); }, 5 * 60 * 1000); // обои могли смениться
 
+function renderPaySeg() {
+  const seg = $('paySeg'), p = payPeriod();
+  if (!seg.dataset.ready) { // первый показ без анимации
+    seg.classList.add('noanim'); seg.dataset.ready = '1';
+    requestAnimationFrame(() => requestAnimationFrame(() => seg.classList.remove('noanim')));
+  }
+  seg.dataset.pos = String(PAY_POS[p]);
+  seg.querySelectorAll('button').forEach(b => {
+    const on = b.dataset.period === p;
+    b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on));
+  });
+}
+
 function applySettings(s) {
   settings = s;
   applyTheme(s);
@@ -321,6 +340,7 @@ function applySettings(s) {
   // чем резче стекло, тем ближе цвета к настоящим обоям; насыщенность растёт вместе с размытием
   document.documentElement.style.setProperty('--glass-sat', String(+(1 + 0.8 * Math.min(1, gb / 20)).toFixed(2)));
   if (document.activeElement !== $('fBlur')) $('fBlur').value = s.glassBlur ?? 20;
+  renderPaySeg();
   if (!payTimer) dayPay = { ...(s.dayPay || {}) }; // пока человек вводит сумму, локальные значения главнее
   document.documentElement.style.setProperty('--alpha', String(s.opacity));
   document.body.classList.toggle('locked', !!s.locked);
@@ -550,7 +570,11 @@ $('themeSeg').addEventListener('click', e => {
   const b = e.target.closest('button[data-theme]');
   if (b) api.setSettings({ theme: b.dataset.theme });
 });
-$('tOnly').onchange = () => api.setSettings({ onlyMine: $('tOnly').checked });
+$('paySeg').addEventListener('click', e => {
+  const b = e.target.closest('button[data-period]');
+  if (b) api.setSettings({ payPeriod: b.dataset.period });
+});
+$('tOnly').onchange =() => api.setSettings({ onlyMine: $('tOnly').checked });
 $('tTop').onchange = () => api.setSettings({ alwaysOnTop: $('tTop').checked });
 $('tLock').onchange = () => api.setSettings({ locked: $('tLock').checked });
 
