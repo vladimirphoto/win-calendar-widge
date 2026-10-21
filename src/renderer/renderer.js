@@ -42,7 +42,8 @@ function plural(n, one, few, many) {
 const hasAnyNames = () => (settings?.keywords || '').trim() !== '';
 function isShift(title) {
   const keys = (settings?.keywords || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
-  if (!keys.length) return true; // слов нет: все события считаются сменами
+  // имя не заполнено: чистый календарь без отметок смен (кроме примеров до входа в Google)
+  if (!keys.length) return demo;
   const t = String(title).toLowerCase();
   return keys.some(k => t.includes(k));
 }
@@ -114,6 +115,7 @@ async function sync() {
     render();
     renderRates();
     updateNext(true);
+    renderNotifyWhen();
   } else if (res.code === 'NOT_AUTH') {
     loggedIn = false; demo = true; upcoming = [];
     events = indexEvents(demoEvents());
@@ -162,6 +164,7 @@ function render() {
   const first = new Date(view.getFullYear(), view.getMonth(), 1);
   const start = new Date(first); start.setDate(1 - ((first.getDay() + 6) % 7));
   const todayK = ymd(new Date()), selK = ymd(sel);
+  const clean = !demo && !hasAnyNames(); // имя не заполнено: никаких отметок смен и точек
   let html = '';
   for (let i = 0; i < 42; i++) {
     const d = new Date(start); d.setDate(start.getDate() + i);
@@ -174,7 +177,7 @@ function render() {
     // цвета студий (смен) за день без повторов
     const sc = [...new Set(evs.filter(e => e.shift).map(e => e.color || '#0f7b6c'))].slice(0, 3);
     // по точке на каждую студию (цвет) за день, в одном и том же порядке во всех днях
-    const dcs = [...new Set(evs.map(e => e.color || ''))];
+    const dcs = clean ? [] : [...new Set(evs.map(e => e.color || ''))];
     dcs.forEach(c => { if (!colorOrder.includes(c)) colorOrder.push(c); });
     dcs.sort((x, y) => colorOrder.indexOf(x) - colorOrder.indexOf(y));
     const dots = dcs.slice(0, 6).map(c => `<span class="dot"${c ? ` data-c="${esc(c)}"` : ''}></span>`).join('');
@@ -292,6 +295,19 @@ function applySettings(s) {
   renderRates();
   render();
   updateNext(true);
+  renderNotifyWhen();
+}
+
+// подсказка: когда придёт напоминание (считаем от ближайшей смены, если её нет, от 10:00)
+function renderNotifyWhen() {
+  const el = $('notifyWhen'); if (!el || !settings) return;
+  const nxt = upcoming.filter(e => e.shift && !e.allDay && e.start > new Date()).sort((a, b) => a.start - b.start)[0];
+  const h = nxt ? nxt.start.getHours() : 10, m = nxt ? nxt.start.getMinutes() : 0;
+  const lead = Math.max(1, Number(settings.notifyHours) || 1);
+  const at = new Date(2000, 0, 5, h, m) - lead * 3600e3;
+  const d = new Date(at), prev = d.getDate() !== 5;
+  const hhmm = `${pad(h)}:${pad(m)}`;
+  el.textContent = `Для смены в ${hhmm} напоминание придёт ${prev ? 'накануне ' : ''}в ${fmtT(d)}.`;
 }
 
 /* ---------- ставки по студиям ---------- */

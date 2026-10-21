@@ -55,8 +55,8 @@
 
     <div class="field">
       <label for="fKeys">Что считать сменой (слова в названии)</label>
-      <input id="fKeys" type="text" placeholder="пусто = все события" spellcheck="false">
-      <p class="hint">Пусто: сменой считается каждое событие, цвет берётся из метки в Google Календаре (цвет студии). Если в календаре есть и личные события, впишите слова из названий смен через запятую (например, своё имя). Чтобы скрыть всё остальное, включите «Показывать только мои смены».</p>
+      <input id="fKeys" type="text" placeholder="ваше имя, как в названии смены" spellcheck="false">
+      <p class="hint">Впишите своё имя так, как оно написано в названиях смен (можно несколько слов через запятую). Пока поле пустое, виджет остаётся чистым календарём: без отметок смен, заработка и напоминаний. Чтобы скрыть чужие смены, включите «Показывать только мои смены».</p>
     </div>
 
     <div class="field">
@@ -87,6 +87,7 @@
       <label class="nm" for="fNotifyEve">Накануне, для смен «на весь день»</label>
       <span class="fld"><input id="fNotifyEve" type="time"></span>
     </div>
+    <p class="hint" id="notifyWhen"></p>
     <p class="hint">Нужны слова в поле «Что считать сменой», иначе напоминания не приходят.</p>
     <div class="row"><button class="chip" id="btnNotifyTest" type="button">Уведомить сейчас</button><span class="hint" id="notifyMsg" style="margin:0;align-self:center"></span></div>
 

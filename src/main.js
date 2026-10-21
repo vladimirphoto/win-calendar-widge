@@ -7,13 +7,14 @@ const fs = require('fs');
 const http = require('http');
 const crypto = require('crypto');
 const os = require('os');
-const { spawn } = require('child_process');
+const { spawn, execFile } = require('child_process');
 const EMBEDDED = require('./google-client');
 const { createUpdater } = require('./updater');
 const UPDATE_CFG = require('./update-config');
 
-// Windows показывает этот идентификатор как название программы в заголовке уведомлений
-const APP_ID = 'Календарь';
+// Идентификатор приложения для уведомлений Windows; название и значок для заголовка уведомления регистрируются в реестре (registerToastIdentity)
+const APP_ID = 'CalendarWidget';
+const APP_TITLE = 'Календарь';
 const SCOPE = 'https://www.googleapis.com/auth/calendar.readonly';
 const WIN_W = 420;
 const WIN_H = 660;
@@ -22,7 +23,7 @@ const CACHE_RANGES = 8;          // сколько периодов держат
 const NOTIFY_HORIZON = 7 * 24 * 3600 * 1000;
 
 const DEFAULTS = {
-  keywords: '', // пусто = все события календаря считаются сменами и красятся цветом студии
+  keywords: '', // ваше имя в названиях смен; пусто = чистый календарь без отметок смен
   clientId: '', // свой Client ID (старые настройки); пусто = используется вшитый
   autostart: true,
   alwaysOnTop: false,
@@ -58,6 +59,25 @@ const tokenFile = () => dataPath('token.bin');
 const secretFile = () => dataPath('secret.bin');
 const cacheFile = () => dataPath('events-cache.bin');
 const iconPath = path.join(__dirname, '..', 'build', 'icon.png');
+// значок для уведомлений: файл внутри asar системе недоступен, поэтому отдаём картинкой из памяти
+const toastIcon = () => nativeImage.createFromPath(iconPath);
+
+/* ---------- название и значок в заголовке уведомлений Windows ---------- */
+const AUMID_KEY = 'HKCU\\Software\\Classes\\AppUserModelId\\' + APP_ID;
+const regRun = args => new Promise(res => execFile('reg', args, { windowsHide: true, timeout: 8000 }, err => res(!err)));
+async function registerToastIdentity() {
+  if (process.platform !== 'win32') return;
+  try {
+    const icon = dataPath('icon.png');
+    fs.mkdirSync(app.getPath('userData'), { recursive: true });
+    fs.writeFileSync(icon, fs.readFileSync(iconPath));
+    await regRun(['add', AUMID_KEY, '/v', 'DisplayName', '/t', 'REG_SZ', '/d', APP_TITLE, '/f']);
+    await regRun(['add', AUMID_KEY, '/v', 'IconUri', '/t', 'REG_SZ', '/d', icon, '/f']);
+  } catch (e) { console.error('toast identity failed', e); }
+}
+async function unregisterToastIdentity() {
+  if (process.platform === 'win32') await regRun(['delete', AUMID_KEY, '/f']);
+}
 
 /* ---------- настройки ---------- */
 function readSecret() {
@@ -360,7 +380,7 @@ function fireNotification(ev, key) {
   showNote('Скоро смена: ' + (ev.title || 'без названия'), `Начало в ${at}, через ${left}`);
 }
 function showNote(title, body) {
-  const n = new Notification({ title, body, icon: iconPath });
+  const n = new Notification({ title, body, icon: toastIcon() });
   if (liveNotes.size >= 20) liveNotes.delete(liveNotes.values().next().value);
   liveNotes.add(n);
   n.on('click', () => { win?.show(); win?.focus(); });
@@ -383,11 +403,11 @@ async function checkForUpdates({ auto = false } = {}) {
   if (st.state !== 'available') return st;
   if (auto && settings.autoUpdate && Date.now() - (settings.lastUpdateTry || 0) > 30 * 60 * 1000) {
     settings.lastUpdateTry = Date.now(); saveSettings();
-    if (Notification.isSupported()) new Notification({ title: 'Обновление виджета', body: `Устанавливаю версию ${st.latest}, виджет перезапустится`, icon: iconPath }).show();
+    if (Notification.isSupported()) new Notification({ title: 'Обновление виджета', body: `Устанавливаю версию ${st.latest}, виджет перезапустится`, icon: toastIcon() }).show();
     return updater.install();
   }
   if (auto && Notification.isSupported()) {
-    const n = new Notification({ title: 'Доступно обновление виджета', body: `Версия ${st.latest}. Установить можно в настройках ⚙.`, icon: iconPath });
+    const n = new Notification({ title: 'Доступно обновление виджета', body: `Версия ${st.latest}. Установить можно в настройках ⚙.`, icon: toastIcon() });
     n.on('click', () => { win?.show(); win?.focus(); }); n.show();
   }
   return st;
@@ -421,7 +441,8 @@ async function wipeEverything(deleteExe) {
         { method: 'POST', signal: AbortSignal.timeout(5000) });
     } catch {}
   }
-  // 2) убрать автозапуск
+  // 2) убрать регистрацию названия/значка уведомлений в реестре и автозапуск
+  await unregisterToastIdentity();
   try {
     const exePath = exe || process.execPath;
     app.setLoginItemSettings({ openAtLogin: false, path: exePath });
@@ -681,6 +702,7 @@ if (!app.requestSingleInstanceLock()) {
   app.whenReady().then(() => {
     loadSettings();
     loadRefreshToken();
+    registerToastIdentity();
     loadCache();
     registerIpc();
     createWindow();
