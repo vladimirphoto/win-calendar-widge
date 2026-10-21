@@ -11,6 +11,8 @@ permissions:
 jobs:
   build:
     runs-on: windows-latest
+    env:
+      RELEASES_TOKEN: ${{ secrets.RELEASES_TOKEN }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -27,6 +29,16 @@ jobs:
           path: dist/CalendarWidget.exe
       - uses: softprops/action-gh-release@v2
         with:
+          tag_name: latest
+          name: CalendarWidget 1.0.${{ github.run_number }}
+          files: dist/CalendarWidget.exe
+      # Публичная копия релиза для самообновления виджетов (нужен секрет RELEASES_TOKEN, см. README)
+      - name: Publish to public releases repo
+        if: ${{ env.RELEASES_TOKEN != '' }}
+        uses: softprops/action-gh-release@v2
+        with:
+          repository: vladimirphoto/win-calendar-widget-releases
+          token: ${{ secrets.RELEASES_TOKEN }}
           tag_name: latest
           name: CalendarWidget 1.0.${{ github.run_number }}
           files: dist/CalendarWidget.exe
