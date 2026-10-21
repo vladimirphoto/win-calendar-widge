@@ -25,6 +25,9 @@ const fmtT = d => d.toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit
 const localDate = s => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
 const sameMonth = (a, b) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth();
 
+let dayPay = {};          // сумма за конкретный день: 'YYYY-MM-DD|цвет' -> ₸ (заменяет ставку студии)
+let payTimer = 0;
+let agEvs = [];
 const money = n => Math.round(n).toLocaleString('ru-RU') + ' ₸';
 const rateKey = c => (c || 'none').toLowerCase();
 const isToday = d => ymd(d) === ymd(new Date());
@@ -137,11 +140,11 @@ async function doLogin() {
 
 /* ---------- отрисовка ---------- */
 function setStatus(kind, text) {
-  $('status').className = 'status' + (kind ? ' ' + kind : '');
+  $('status').className = 'status' + (kind ? ' ' + kind : '') + (loggedIn ? '' : ' login');
   $('statusText').textContent = text;
 }
 function updateButtons() {
-  $('btnSync').textContent = loggedIn ? 'Обновить' : 'Войти в Google';
+  $('status').classList.toggle('login', !loggedIn);
   $('btnLogout').hidden = !loggedIn;
   $('btnLogin').hidden = loggedIn;
   $('authHint').textContent = loggedIn
@@ -189,41 +192,58 @@ function render() {
     }
   });
 
-  // счётчик смен и заработок в отображаемом месяце
-  const seen = new Set(); let n = 0, earn = 0;
-  const rates = settings?.rates || {};
+  // счётчик смен в отображаемом месяце
+  const n = monthShifts().length;
+  let sub = n ? `${n} ${plural(n, 'смена', 'смены', 'смен')}` : '';
+  if (n && demo) sub += ' (пример)';
+  $('sub').textContent = sub;
+  updateEarn();
+  renderAgenda();
+  renderSeg();
+  fitWindow();
+}
+
+// сумма за смену: введённая для этого дня и студии, иначе ставка студии по умолчанию
+const payKey = e => ymd(e.start) + '|' + rateKey(e.color);
+const defaultRate = e => (settings?.rates || {})[rateKey(e.color)] || 0;
+const payFor = e => { const v = dayPay[payKey(e)]; return v === undefined ? defaultRate(e) : v; };
+
+function monthShifts() {
+  const seen = new Set(); const out = [];
   for (const [k, list] of Object.entries(events)) {
     if (!sameMonth(localDate(k), view)) continue;
     for (const e of list) {
       if (!e.shift) continue;
       const id = e.id + '|' + e.start.getTime();
-      if (!seen.has(id)) { seen.add(id); n++; earn += rates[rateKey(e.color)] || 0; }
+      if (!seen.has(id)) { seen.add(id); out.push(e); }
     }
   }
-  let sub = n ? `${n} ${plural(n, 'смена', 'смены', 'смен')}` : '';
-  if (n && demo) sub += ' (пример)';
-  $('sub').textContent = sub;
-  // заработок за месяц: справа от даты над списком
+  return out;
+}
+
+function updateEarn() {
+  const list = monthShifts();
+  const earn = list.reduce((sum, e) => sum + payFor(e), 0);
   const earnEl = $('earn');
-  const showEarn = n > 0 && earn > 0;
+  const showEarn = list.length > 0 && earn > 0;
   if (showEarn) earnEl.textContent = 'Заработок: ' + money(earn);
   if (earnEl.hidden === showEarn) earnEl.hidden = !showEarn;
-  renderAgenda();
-  renderSeg();
-  fitWindow();
 }
 
 function renderAgenda() {
   $('agTitle').textContent = sel.toLocaleDateString('ru', { weekday: 'long', day: 'numeric', month: 'long' });
   const evs = visibleEvents(ymd(sel));
   const list = $('agList');
+  if (list.contains(document.activeElement)) return; // не перерисовываем, пока вводят сумму
+  agEvs = evs;
   if (!evs.length) { list.innerHTML = '<div class="empty">Нет событий</div>'; return; }
   list.innerHTML = evs.map((e, i) => {
     const time = e.allDay ? 'Весь день' : `${fmtT(e.start)}–${fmtT(e.end)}`;
     return `<div class="ev${e.shift ? ' s' : ''}" data-i="${i}"><div class="bar"></div>
       <div class="t">${esc(time)}</div>
       <div><div class="n">${esc(e.title)}${e.shift ? '<span class="tag">смена</span>' : ''}</div>
-      ${e.calendar ? `<div class="c">${esc(e.calendar)}</div>` : ''}</div></div>`;
+      ${e.calendar ? `<div class="c">${esc(e.calendar)}</div>` : ''}</div>
+      ${e.shift ? `<label class="pay" title="Сколько вы заработали в этот день (заменяет ставку студии)"><input type="number" min="0" max="1000000000" step="1000" inputmode="numeric" data-i="${i}" placeholder="${defaultRate(e) || 0}" value="${dayPay[payKey(e)] ?? ''}"><span class="cur">₸</span></label>` : ''}</div>`;
   }).join('');
   list.querySelectorAll('.ev').forEach(el => {
     const e = evs[Number(el.dataset.i)];
@@ -243,6 +263,7 @@ function applyAccent(hex) {
 
 function applySettings(s) {
   settings = s;
+  if (!payTimer) dayPay = { ...(s.dayPay || {}) }; // пока человек вводит сумму, локальные значения главнее
   document.documentElement.style.setProperty('--alpha', String(s.opacity));
   document.body.classList.toggle('locked', !!s.locked);
   $('fKeys').value = s.keywords;
@@ -320,6 +341,23 @@ function renderRates() {
   }
 }
 
+function flushPay() {
+  clearTimeout(payTimer); payTimer = 0;
+  api.setSettings({ dayPay });
+}
+$('agList').addEventListener('input', ev => {
+  const inp = ev.target.closest('.pay input');
+  if (!inp) return;
+  const e = agEvs[Number(inp.dataset.i)];
+  if (!e) return;
+  if (inp.value === '') delete dayPay[payKey(e)];
+  else dayPay[payKey(e)] = Math.max(0, Math.min(1e9, Math.round(Number(inp.value) || 0)));
+  updateEarn();
+  clearTimeout(payTimer);
+  payTimer = setTimeout(flushPay, 600);
+});
+$('agList').addEventListener('change', () => { if (payTimer) flushPay(); });
+
 let ratesTimer;
 $('rates').addEventListener('input', () => {
   clearTimeout(ratesTimer);
@@ -390,7 +428,7 @@ $('btnToday').onclick = goToday;
 $('btnHide').onclick = () => api.hide();
 $('btnCfg').onclick = openPanel;
 $('btnDone').onclick = closePanel;
-$('btnSync').onclick = () => (loggedIn ? sync() : doLogin());
+$('status').onclick = () => { if (!loggedIn) doLogin(); };
 $('btnLogin').onclick = () => doLogin();
 $('btnLogout').onclick = async () => { await api.logout(); loggedIn = false; demo = true; upcoming = []; events = indexEvents(demoEvents()); updateButtons(); setStatus('', 'Не подключено'); render(); updateNext(true); };
 $('days').addEventListener('click', e => {
@@ -406,6 +444,7 @@ for (const t of ['pointerdown', 'wheel', 'keydown']) document.addEventListener(t
 $('days').addEventListener('wheel', e => { e.preventDefault(); shiftMonth(e.deltaY > 0 ? 1 : -1); }, { passive: false });
 document.addEventListener('keydown', e => {
   if (!$('panel').hidden) { if (e.key === 'Escape') closePanel(); return; }
+  if (e.target?.closest?.('input')) return; // стрелки в поле ввода не листают месяц
   if (e.key === 'ArrowLeft') shiftMonth(-1);
   if (e.key === 'ArrowRight') shiftMonth(1);
 });

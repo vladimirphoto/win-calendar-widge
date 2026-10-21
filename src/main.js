@@ -32,6 +32,7 @@ const DEFAULTS = {
   lastUpdateTry: 0, // когда последний раз пробовали автоустановку (защита от зацикливания)
   notify: true,    // уведомление Windows перед сменой
   notifyHours: 2,  // за сколько часов
+  dayPay: {},      // сумма за конкретный день и студию: { '2026-10-22|#0b8043': 12000 }, заменяет ставку по умолчанию
   rates: {},       // ставка за смену по студиям: { '#0b8043': 25000 }, ключ = цвет метки
   bounds: null
 };
@@ -77,6 +78,7 @@ function loadSettings() {
   const { clientSecret: legacySecret, ...rest } = raw;
   settings = { ...DEFAULTS, ...rest };
   if (!settings.rates || typeof settings.rates !== 'object' || Array.isArray(settings.rates)) settings.rates = {};
+  if (!settings.dayPay || typeof settings.dayPay !== 'object' || Array.isArray(settings.dayPay)) settings.dayPay = {};
   customSecret = readSecret();
   // миграция: раньше secret лежал в settings.json открытым текстом
   if (legacySecret && typeof legacySecret === 'string') {
@@ -529,6 +531,15 @@ function updateSettings(patch) {
       if (/^(#[0-9a-f]{3,8}|none)$/i.test(k) && isFinite(n) && n > 0 && n <= 1e9) rates[k.toLowerCase()] = n;
     }
     next.rates = rates;
+  }
+  if (patch.dayPay && typeof patch.dayPay === 'object' && !Array.isArray(patch.dayPay)) {
+    const entries = [];
+    for (const [k, v] of Object.entries(patch.dayPay)) {
+      const n = Math.round(Number(v));
+      if (/^\d{4}-\d{2}-\d{2}\|(#[0-9a-f]{3,8}|none)$/i.test(k) && isFinite(n) && n >= 0 && n <= 1e9) entries.push([k.toLowerCase(), n]);
+    }
+    entries.sort((a, b) => (a[0] < b[0] ? 1 : -1)); // новые даты первыми
+    next.dayPay = Object.fromEntries(entries.slice(0, 1500));
   }
   settings = next;
   saveSettings();
