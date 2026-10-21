@@ -311,3 +311,6 @@ input[type=time]::-webkit-calendar-picker-indicator { filter: invert(.6); cursor
 ::-webkit-scrollbar-thumb:hover { background: color-mix(in srgb, var(--accent) 75%, transparent); background-clip: padding-box; }
 ::-webkit-scrollbar-thumb:active { background: var(--accent); background-clip: padding-box; }
 .list::-webkit-scrollbar-track { margin: 2px 0; }
+
+/* под последним переключателем линия уже есть у заголовка следующего раздела: вторую не рисуем */
+.toggle:has(#tLock) { border-bottom: 0; }

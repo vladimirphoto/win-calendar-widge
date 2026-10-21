@@ -266,6 +266,7 @@ function applyTheme(s) {
   const t = effectiveTheme(s);
   document.documentElement.dataset.theme = t;
   $('glassField').hidden = t !== 'glass';
+  $('opacityField').hidden = t === 'glass'; // в «Стекле» вместо обычной прозрачности свой ползунок
   if (t === 'glass') refreshGlass(); else $('glassbg').hidden = true;
   const seg = $('themeSeg');
   if (!seg.dataset.ready) { // первый показ без анимации
