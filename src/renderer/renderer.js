@@ -386,8 +386,10 @@ function updateNext(pushToMain) {
   const shifts = (loggedIn && !demo ? upcoming : []).filter(e => e.shift && e.end > now);
   shifts.sort((a, b) => a.start - b.start);
   if (pushToMain) {
-    api.setShifts(shifts.filter(e => !e.allDay && e.start > now).slice(0, 100)
-      .map(e => ({ id: e.id, title: e.title, start: e.start.getTime() })));
+    // смены на весь день уведомляют накануне вечером; без слов в «Что считать сменой» «сменой» считается всё подряд, поэтому их не шлём
+    const hasKeys = (settings?.keywords || '').trim() !== '';
+    api.setShifts(shifts.filter(e => e.start > now && (!e.allDay || hasKeys)).slice(0, 100)
+      .map(e => ({ id: e.id, title: e.title, start: e.start.getTime(), allDay: !!e.allDay })));
   }
 }
 
@@ -490,6 +492,27 @@ $('btnWipeYes').onclick = async () => {
   $('btnWipeYes').disabled = true;
   const r = await api.wipe({ deleteExe: !!settings?.canDeleteExe && $('tWipeExe').checked });
   if (!r.ok) { $('btnWipeYes').disabled = false; showCfgErr(r.message || 'Не удалось удалить данные'); }
+};
+$('btnNotifyTest').onclick = async () => {
+  const msg = $('notifyMsg');
+  const r = await api.notifyTest();
+  msg.textContent = r?.ok ? 'Отправлено. Не видите? Проверьте режим «Не беспокоить» в Windows.' : (r?.message || 'Не удалось');
+  setTimeout(() => { msg.textContent = ''; }, 8000);
+};
+let clearArmed = 0;
+$('btnClearPay').onclick = async () => {
+  const b = $('btnClearPay');
+  if (!clearArmed) {
+    b.textContent = 'Точно очистить?';
+    clearArmed = setTimeout(() => { clearArmed = 0; b.textContent = 'Очистить заработок'; }, 4000);
+    return;
+  }
+  clearTimeout(clearArmed); clearArmed = 0; b.textContent = 'Очистить заработок';
+  clearTimeout(payTimer); payTimer = 0;
+  dayPay = {};
+  await api.setSettings({ rates: {}, dayPay: {} });
+  renderRates();
+  render();
 };
 $('tNotify').onchange = () => api.setSettings({ notify: $('tNotify').checked });
 let notifyTimer;

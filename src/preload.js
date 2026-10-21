@@ -19,6 +19,7 @@ contextBridge.exposeInMainWorld('widget', {
   updateInstall: () => ipcRenderer.invoke('update:install'),
   onUpdate: cb => on('update:state', cb),
   wipe: opts => ipcRenderer.invoke('app:wipe', opts),
+  notifyTest: () => ipcRenderer.invoke('notify:test'),
   setShifts: list => ipcRenderer.send('notify:shifts', list),
   hide: () => ipcRenderer.send('window:hide'),
   fit: h => ipcRenderer.send('window:fit', h),

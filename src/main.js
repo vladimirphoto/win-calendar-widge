@@ -318,6 +318,7 @@ function cacheLookup(key, fromMs, toMs) {
 
 /* ---------- уведомления о сменах ---------- */
 let shiftList = [];            // ближайшие смены от интерфейса: { id, title, start, end } в мс
+const ALLDAY_LEAD_H = 4;      // для смен на весь день: уведомление накануне в 20:00
 let notifyTimers = [];
 const notified = new Set();
 const liveNotes = new Set();   // держим ссылки, иначе клик по уведомлению может потеряться
@@ -325,16 +326,18 @@ const liveNotes = new Set();   // держим ссылки, иначе клик
 function setShiftList(list) {
   shiftList = (Array.isArray(list) ? list : []).slice(0, 200)
     .filter(e => e && typeof e.id === 'string' && Number.isFinite(e.start))
-    .map(e => ({ id: e.id.slice(0, 200), title: String(e.title || '').slice(0, 120), start: e.start }));
+    .map(e => ({ id: e.id.slice(0, 200), title: String(e.title || '').slice(0, 120), start: e.start, allDay: e.allDay === true }));
   rescheduleNotifications();
 }
 function rescheduleNotifications() {
   notifyTimers.forEach(clearTimeout); notifyTimers = [];
   if (!settings.notify || !Notification.isSupported()) return;
-  const lead = settings.notifyHours * 3600 * 1000, now = Date.now();
+  const now = Date.now();
   for (const ev of shiftList) {
     if (ev.start <= now || ev.start - now > NOTIFY_HORIZON) continue;
-    const key = `${ev.id}|${ev.start}|${settings.notifyHours}`;
+    // смена «на весь день» не имеет времени начала: напоминаем накануне в 20:00 (за 4 часа до полуночи)
+    const lead = (ev.allDay ? ALLDAY_LEAD_H : settings.notifyHours) * 3600 * 1000;
+    const key = `${ev.id}|${ev.start}|${ev.allDay ? 'd' : settings.notifyHours}`;
     if (notified.has(key)) continue;
     notifyTimers.push(setTimeout(() => fireNotification(ev, key), Math.max(0, ev.start - lead - now)));
   }
@@ -343,10 +346,14 @@ function fireNotification(ev, key) {
   if (notified.has(key) || ev.start <= Date.now()) return;
   notified.add(key);
   if (notified.size > 500) notified.delete(notified.values().next().value); // не растёт бесконечно
+  if (ev.allDay) return showNote('Завтра смена: ' + (ev.title || 'без названия'), 'Смена на весь день');
   const mins = Math.max(1, Math.round((ev.start - Date.now()) / 60000));
   const left = mins >= 60 ? `${Math.floor(mins / 60)} ч${mins % 60 ? ' ' + (mins % 60) + ' мин' : ''}` : `${mins} мин`;
   const at = new Date(ev.start).toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' });
-  const n = new Notification({ title: 'Скоро смена: ' + (ev.title || 'без названия'), body: `Начало в ${at}, через ${left}`, icon: iconPath });
+  showNote('Скоро смена: ' + (ev.title || 'без названия'), `Начало в ${at}, через ${left}`);
+}
+function showNote(title, body) {
+  const n = new Notification({ title, body, icon: iconPath });
   if (liveNotes.size >= 20) liveNotes.delete(liveNotes.values().next().value);
   liveNotes.add(n);
   n.on('click', () => { win?.show(); win?.focus(); });
@@ -632,6 +639,11 @@ function registerIpc() {
     }
   });
   ipcMain.on('notify:shifts', (_e, list) => setShiftList(list));
+  ipcMain.handle('notify:test', () => {
+    if (!Notification.isSupported()) return { ok: false, message: 'Уведомления не поддерживаются в этой системе' };
+    showNote('Скоро смена: проверка', 'Если вы видите это, уведомления работают');
+    return { ok: true };
+  });
   ipcMain.handle('update:state', () => updater.getState());
   ipcMain.handle('update:check', () => checkForUpdates({ auto: false }));
   ipcMain.handle('update:install', async () => { settings.lastUpdateTry = Date.now(); saveSettings(); return updater.install(); });

@@ -65,7 +65,7 @@
     </div>
 
     <div class="toggle"><span>Запускать при старте Windows</span><label class="sw"><input type="checkbox" id="tAuto"><b></b></label></div>
-    <div class="toggle"><span>Показывать только мои смены (по словам выше)</span><label class="sw"><input type="checkbox" id="tOnly"><b></b></label></div>
+    <div class="toggle"><span>Показывать только мои смены</span><label class="sw"><input type="checkbox" id="tOnly"><b></b></label></div>
     <div class="toggle"><span>Поверх всех окон</span><label class="sw"><input type="checkbox" id="tTop"><b></b></label></div>
     <div class="toggle"><span>Закрепить положение</span><label class="sw"><input type="checkbox" id="tLock"><b></b></label></div>
     <p class="hint" id="devNote" hidden>Автозапуск работает только в установленной версии (после npm run dist).</p>
@@ -74,6 +74,8 @@
     <p class="hint">Ставка по умолчанию за одну смену в тенге, отдельно для каждой студии. Если в какой-то день вы заработали другую сумму, впишите её в карточке смены этого дня: она заменит ставку. Считаются только ваши смены; сумма за месяц стоит справа от даты.</p>
     <div id="rates"></div>
     <p class="hint" id="ratesEmpty">Студии появятся после первой синхронизации с календарём.</p>
+    <div class="row"><button class="chip" id="btnClearPay" type="button">Очистить заработок</button></div>
+    <p class="hint">Стирает все ставки и суммы по дням, чтобы внести их заново.</p>
 
     <h3 class="sect">Уведомления</h3>
     <div class="toggle"><span>Напоминать о смене (уведомление Windows)</span><label class="sw"><input type="checkbox" id="tNotify"><b></b></label></div>
@@ -82,6 +84,8 @@
       <input id="fNotifyH" type="number" min="1" max="48" step="1" inputmode="numeric">
       <span class="cur">ч</span>
     </div>
+    <p class="hint">Для смен «на весь день» напоминание приходит накануне в 20:00 (нужны слова в поле «Что считать сменой»).</p>
+    <div class="row"><button class="chip" id="btnNotifyTest" type="button">Уведомить сейчас</button><span class="hint" id="notifyMsg" style="margin:0;align-self:center"></span></div>
 
     <h3 class="sect">Google Календарь</h3>
     <div class="row">
