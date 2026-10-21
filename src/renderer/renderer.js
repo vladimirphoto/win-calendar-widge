@@ -14,7 +14,6 @@ let lastSync = null;
 let offline = false;
 let upcoming = [];        // события от сегодняшнего дня (не зависят от того, какой месяц листают)
 let lastKeys = null;
-let lastScale = null;
 let lastActivity = Date.now();
 const IDLE_RETURN_MS = 2 * 60 * 1000; // через 2 минуты без действий вернуться на сегодня
 
@@ -263,10 +262,6 @@ function applySettings(s) {
   document.body.classList.toggle('locked', !!s.locked);
   $('fKeys').value = s.keywords;
   $('fOpacity').value = Math.round(s.opacity * 100);
-  const sc = Math.round((s.scale || 1) * 100);
-  if (document.activeElement !== $('fScale')) { $('fScale').value = sc; $('scaleVal').textContent = sc + '%'; }
-  if (lastScale !== null && lastScale !== sc && !$('panel').hidden) api.fit(10000); // размер сменился: настройки снова на всю высоту
-  lastScale = sc;
   $('tAuto').checked = !!s.autostart;
   $('tTop').checked = !!s.alwaysOnTop;
   $('tLock').checked = !!s.locked;
@@ -479,9 +474,6 @@ document.addEventListener('keydown', e => {
 
 let keysTimer;
 $('fKeys').addEventListener('input', () => { clearTimeout(keysTimer); keysTimer = setTimeout(() => api.setSettings({ keywords: $('fKeys').value }), 300); });
-// размер применяем, когда отпустили ползунок (во время перетаскивания окно не дёргается под курсором)
-$('fScale').addEventListener('input', () => { $('scaleVal').textContent = $('fScale').value + '%'; });
-$('fScale').addEventListener('change', () => api.setSettings({ scale: Number($('fScale').value) / 100 }));
 $('fOpacity').addEventListener('input', () => api.setSettings({ opacity: Number($('fOpacity').value) / 100 }));
 $('tAuto').onchange = () => api.setSettings({ autostart: $('tAuto').checked });
 $('segAll').onclick = () => api.setSettings({ onlyMine: false });
