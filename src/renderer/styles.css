@@ -227,12 +227,9 @@ button:disabled { opacity: .55; }
 input[type=time]::-webkit-calendar-picker-indicator { filter: invert(.6); cursor: pointer; }
 
 /* кнопки в настройках: всегда видны как кнопки, при наведении подсвечиваются акцентом */
-.panel .chip:not(.primary), #btnToday { background: var(--hover); border-color: var(--line); transition: background .12s, border-color .12s, transform .12s, box-shadow .12s; }
+.panel .chip:not(.primary), #btnToday { background: var(--hover); border-color: var(--line); transition: background .12s, border-color .12s; }
 .panel .chip:not(.primary):hover, #btnToday:hover { background: color-mix(in srgb, var(--accent) 22%, var(--hover)); border-color: color-mix(in srgb, var(--accent) 60%, transparent); }
 .panel .chip:not(.primary):active, #btnToday:active { background: color-mix(in srgb, var(--accent) 32%, var(--hover)); }
-/* «Сегодня»: при наведении ярче и чуть приподнимается */
-#btnToday:hover { filter: brightness(1.12); transform: translateY(-1px); box-shadow: 0 3px 10px rgba(0, 0, 0, .2); }
-#btnToday:active { filter: none; transform: none; box-shadow: none; }
 .panel .chip:disabled { opacity: .5; }
 
 /* поле с подписью-единицей внутри («ч», «₸»); все такие поля одной ширины и выровнены по правому краю */
@@ -251,9 +248,6 @@ input[type=time]::-webkit-calendar-picker-indicator { filter: invert(.6); cursor
 .studio .who { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .studio .fld { width: 92px; }
 
-/* точка студии в карточке студии */
-.studio .place { margin-top: 5px; font-size: 12px; padding: 5px 8px; }
-
 /* шапка настроек: переключатель темы рядом с «Готово» */
 .panel-actions { display: flex; align-items: center; gap: 10px; }
 .seg3 { grid-template-columns: repeat(3, 1fr); }
@@ -263,20 +257,33 @@ input[type=time]::-webkit-calendar-picker-indicator { filter: invert(.6); cursor
 .seg3 button { padding: 4px 9px; display: grid; place-items: center; }
 .seg3 button svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 
-/* ---- тема «Стекло» ---- */
+/* ---- тема «Стекло» (в духе iOS): размытые обои, светящийся ободок, скруглённая карточка с тенью, как в светлой и тёмной ---- */
+.glassbg { display: none; }
 :root[data-theme="glass"] .card {
-  -webkit-backdrop-filter: blur(30px) saturate(180%); backdrop-filter: blur(30px) saturate(180%);
-  border: 1px solid rgba(255, 255, 255, .32);
-  border-radius: 22px;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, .34), 0 2px 6px rgba(0, 0, 0, .18),
-    inset 0 1px 0 rgba(255, 255, 255, .5), inset 0 -1px 0 rgba(255, 255, 255, .08), inset 0 0 28px rgba(255, 255, 255, .05);
+  isolation: isolate;
+  background: linear-gradient(150deg, rgba(255, 255, 255, .26) 0%, rgba(255, 255, 255, .09) 38%, rgba(255, 255, 255, .03) 100%),
+    rgba(22, 26, 38, calc(var(--alpha) * .36));
+  border: 1px solid rgba(255, 255, 255, .14);
+  border-radius: 24px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, .38), 0 2px 8px rgba(0, 0, 0, .2),
+    inset 0 0 26px rgba(255, 255, 255, .06);
 }
-:root[data-theme="glass"] .panel { -webkit-backdrop-filter: blur(26px) saturate(170%); backdrop-filter: blur(26px) saturate(170%); }
+/* размытые обои, выровненные с экраном (см. layoutGlass) */
+:root[data-theme="glass"] .glassbg { display: block; position: absolute; inset: 0; z-index: -1; overflow: hidden; border-radius: inherit; pointer-events: none; }
+:root[data-theme="glass"] .glassbg[hidden] { display: none; }
+.gw { position: absolute; inset: -60px; background-repeat: no-repeat; filter: blur(var(--glass-blur, 20px)) saturate(1.9) brightness(.98); }
+/* зеркальный ободок: яркий сверху-слева и снизу-справа, прозрачный по бокам */
+:root[data-theme="glass"] .card::after {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1.2px; pointer-events: none; z-index: 6;
+  background: linear-gradient(140deg, rgba(255, 255, 255, .85), rgba(255, 255, 255, .08) 32%, rgba(255, 255, 255, .06) 66%, rgba(255, 255, 255, .5));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+}
+:root[data-theme="glass"] .panel { background: rgba(18, 22, 34, .92); border-radius: inherit; }
 :root[data-theme="glass"] .day { border-radius: 12px; }
 :root[data-theme="glass"] .ev { border-radius: 12px; border-color: rgba(255, 255, 255, .2); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .18); }
 :root[data-theme="glass"] .chip { border-radius: 10px; }
 :root[data-theme="glass"] .panel .chip:not(.primary), :root[data-theme="glass"] #btnToday { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .25); }
-:root[data-theme="glass"] #btnToday:hover { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .3), 0 4px 14px rgba(0, 0, 0, .25); }
 :root[data-theme="glass"] input[type=text], :root[data-theme="glass"] input[type=password],
 :root[data-theme="glass"] input[type=number], :root[data-theme="glass"] input[type=time] { border-radius: 10px; border-color: rgba(255, 255, 255, .2); border-bottom-color: rgba(255, 255, 255, .45); background: rgba(255, 255, 255, .1); }
 :root[data-theme="glass"] .seg { border-radius: 12px; border-color: rgba(255, 255, 255, .22); }
@@ -284,18 +291,11 @@ input[type=time]::-webkit-calendar-picker-indicator { filter: invert(.6); cursor
 :root[data-theme="glass"] .seg button { border-radius: 10px; }
 :root[data-theme="glass"] .seg button.on { color: #fff; }
 :root[data-theme="glass"] .sw input:checked + b { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .35); }
-
-/* акриловая подложка окна включена (Windows 11 22H2+): карточка занимает окно целиком, без полей под тень */
-body.native-glass { padding: 0; }
-:root[data-theme="glass"] body.native-glass .card {
-  border-radius: 0; box-shadow: none; border-color: rgba(255, 255, 255, .22);
-  -webkit-backdrop-filter: none; backdrop-filter: none;
-  background: linear-gradient(160deg, rgba(255, 255, 255, .14), rgba(255, 255, 255, .02) 60%), rgba(18, 22, 34, calc(var(--alpha) * .24));
-}
 @media (prefers-reduced-transparency: reduce) {
-  :root[data-theme="glass"] { --bg: rgba(24, 28, 40, .94); --panel-bg: rgba(24, 28, 40, .98); }
-  :root[data-theme="glass"] .card, :root[data-theme="glass"] .panel { -webkit-backdrop-filter: none; backdrop-filter: none; }
+  :root[data-theme="glass"] .glassbg { display: none; }
+  :root[data-theme="glass"] .card { background: rgba(24, 28, 40, .94); }
 }
 
 :root[data-theme="glass"] .day.today { color: #fff; }
 :root[data-theme="glass"] ::placeholder { color: rgba(255, 255, 255, .42); }
+.field[hidden] { display: none; }

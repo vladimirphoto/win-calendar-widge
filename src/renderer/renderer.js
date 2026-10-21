@@ -75,7 +75,7 @@ function indexEvents(list) {
     }
   }
   for (const k of Object.keys(map)) {
-    map[k].sort((a, b) => (b.allDay - a.allDay) || (a.start - b.start));
+    map[k].sort((a, b) => (b.shift - a.shift) || (b.allDay - a.allDay) || (a.start - b.start)); // мои смены первыми
   }
   return map;
 }
@@ -265,8 +265,8 @@ function effectiveTheme(s) {
 function applyTheme(s) {
   const t = effectiveTheme(s);
   document.documentElement.dataset.theme = t;
-  // у окна включена акриловая подложка: карточка занимает окно целиком, без полей под тень
-  document.body.classList.toggle('native-glass', t === 'glass' && !!s?.nativeGlass);
+  $('glassField').hidden = t !== 'glass';
+  if (t === 'glass') refreshGlass(); else $('glassbg').hidden = true;
   const seg = $('themeSeg');
   if (!seg.dataset.ready) { // первый показ без анимации
     seg.classList.add('noanim'); seg.dataset.ready = '1';
@@ -280,9 +280,43 @@ function applyTheme(s) {
 }
 darkMQ.addEventListener('change', () => { if (settings) { applyTheme(settings); fitWindow(); } });
 
+/* ---- «Стекло»: размытые обои под карточкой, выровненные по экрану ---- */
+const GLASS_PAD = 60; // запас вокруг карточки, чтобы края размытия не выцветали
+let glass = null;
+let glassRaf = 0;
+async function refreshGlass() {
+  try { glass = await api.glassInfo(); } catch { glass = null; }
+  layoutGlass();
+}
+function layoutGlass() {
+  const root = $('glassbg'), gw = $('gw');
+  if (effectiveTheme(settings) !== 'glass' || !glass?.wall || !glass.disp || !glass.win) { root.hidden = true; return; }
+  const { wall, disp, win: wp } = glass;
+  const iw = wall.w, ih = wall.h, dw = disp.width, dh = disp.height;
+  let bw = dw, bh = dh;
+  if (wall.style === 'fill' || wall.style === 'center' || wall.style === 'tile') { const k = Math.max(dw / iw, dh / ih); bw = iw * k; bh = ih * k; }
+  else if (wall.style === 'fit') { const k = Math.min(dw / iw, dh / ih); bw = iw * k; bh = ih * k; }
+  const bx = (dw - bw) / 2, by = (dh - bh) / 2;
+  const r = $('card').getBoundingClientRect();
+  const sx = wp.x + r.left - GLASS_PAD - disp.x, sy = wp.y + r.top - GLASS_PAD - disp.y;
+  if (gw.dataset.url !== wall.url) { gw.style.backgroundImage = `url("${wall.url}")`; gw.dataset.url = wall.url; }
+  gw.style.backgroundSize = `${bw}px ${bh}px`;
+  gw.style.backgroundPosition = `${bx - sx}px ${by - sy}px`;
+  root.hidden = false;
+}
+api.onGlassGeometry(g => {
+  if (!glass || !g) return;
+  glass = { ...glass, ...g };
+  cancelAnimationFrame(glassRaf);
+  glassRaf = requestAnimationFrame(layoutGlass);
+});
+setInterval(() => { if (effectiveTheme(settings) === 'glass' && !document.hidden) refreshGlass(); }, 5 * 60 * 1000); // обои могли смениться
+
 function applySettings(s) {
   settings = s;
   applyTheme(s);
+  document.documentElement.style.setProperty('--glass-blur', (s.glassBlur ?? 20) + 'px');
+  if (document.activeElement !== $('fBlur')) $('fBlur').value = s.glassBlur ?? 20;
   if (!payTimer) dayPay = { ...(s.dayPay || {}) }; // пока человек вводит сумму, локальные значения главнее
   document.documentElement.style.setProperty('--alpha', String(s.opacity));
   document.body.classList.toggle('locked', !!s.locked);
@@ -368,13 +402,6 @@ function renderRates() {
     const name = document.createElement('span'); name.className = 'sn'; name.textContent = st.name; name.title = st.name;
     text.append(name);
     if (mine) { const who = document.createElement('span'); who.className = 'who'; who.textContent = mine; text.append(who); }
-    // точка студии для уведомления («На Маркова»); используется, если в событии календаря не указано место
-    const place = document.createElement('input');
-    place.type = 'text'; place.className = 'place'; place.maxLength = 60; place.spellcheck = false;
-    place.placeholder = 'Точка, напр.: Маркова';
-    place.dataset.p = st.key; place.setAttribute('aria-label', 'Точка студии ' + st.name);
-    const pv = settings?.places?.[st.key]; if (pv) place.value = pv;
-    text.append(place);
     const input = document.createElement('input');
     input.type = 'number'; input.min = '0'; input.step = '500'; input.inputMode = 'numeric';
     input.placeholder = '0'; input.dataset.k = st.key;
@@ -416,12 +443,7 @@ $('rates').addEventListener('input', () => {
     // студии, которых сейчас нет на экране, не теряем
     const shown = new Set(rateIn.map(i => i.dataset.k));
     for (const [k, v] of Object.entries(settings?.rates || {})) if (!shown.has(k)) rates[k] = v;
-    const places = {};
-    const placeIn = [...$('rates').querySelectorAll('input[data-p]')];
-    placeIn.forEach(i => { const t = i.value.trim(); if (t) places[i.dataset.p] = t; });
-    const shownP = new Set(placeIn.map(i => i.dataset.p));
-    for (const [k, v] of Object.entries(settings?.places || {})) if (!shownP.has(k)) places[k] = v;
-    api.setSettings({ rates, places });
+    api.setSettings({ rates });
   }, 400);
 });
 
@@ -443,7 +465,7 @@ function updateNext(pushToMain) {
     // смены на весь день уведомляют накануне вечером; без слов в «Что считать сменой» «сменой» считается всё подряд, поэтому их не шлём
     const hasKeys = hasAnyNames();
     api.setShifts(shifts.filter(e => e.start > now && (!e.allDay || hasKeys)).slice(0, 100)
-      .map(e => ({ id: e.id, title: e.title, start: e.start.getTime(), allDay: !!e.allDay, calendar: e.calendar || '', color: e.color || '', location: e.location || '' })));
+      .map(e => ({ id: e.id, title: e.title, start: e.start.getTime(), allDay: !!e.allDay, calendar: e.calendar || '' })));
   }
 }
 
@@ -471,7 +493,7 @@ function fitWindow() {
     if (!$('panel').hidden) return;
     const list = $('agList');
     const natural = $('card').offsetHeight - list.clientHeight + list.scrollHeight;
-    api.fit(natural + (document.body.classList.contains('native-glass') ? 0 : 32)); // 32 = внешние отступы body (в акриловом «Стекле» их нет)
+    api.fit(natural + 32); // 32 = внешние отступы body
   });
 }
 function showCfgErr(m) { const el = $('cfgErr'); el.textContent = m; el.hidden = false; }
@@ -519,6 +541,7 @@ $('segMine').onclick = () => {
   if (!hasAnyNames()) { openPanel(); $('fKeys').focus(); return; }
   api.setSettings({ onlyMine: true });
 };
+$('fBlur').addEventListener('input', () => api.setSettings({ glassBlur: Number($('fBlur').value) }));
 $('themeSeg').addEventListener('click', e => {
   const b = e.target.closest('button[data-theme]');
   if (b) api.setSettings({ theme: b.dataset.theme });

@@ -8,6 +8,7 @@
 </head>
 <body>
 <main class="card" id="card">
+  <div class="glassbg" id="glassbg" aria-hidden="true" hidden><div class="gw" id="gw"></div></div>
   <header id="head">
     <div class="ttl">
       <div class="month" id="title"></div>
@@ -78,6 +79,10 @@
       <label for="fOpacity">Прозрачность</label>
       <input id="fOpacity" type="range" min="40" max="100" step="2">
     </div>
+    <div class="field" id="glassField" hidden>
+      <label for="fBlur">Размытие стекла</label>
+      <input id="fBlur" type="range" min="0" max="40" step="1">
+    </div>
 
     <div class="toggle"><span>Запускать при старте Windows</span><label class="sw"><input type="checkbox" id="tAuto"><b></b></label></div>
     <div class="toggle"><span>Показывать только мои смены</span><label class="sw"><input type="checkbox" id="tOnly"><b></b></label></div>
@@ -89,7 +94,6 @@
     <p class="hint">Ставка по умолчанию за одну смену в тенге, отдельно для каждой студии. Если в какой-то день вы заработали другую сумму, впишите её в карточке смены этого дня: она заменит ставку. Считаются только ваши смены; сумма за месяц стоит справа от даты. Под названием студии показано ваше имя из поля «Что считать сменой».</p>
     <div id="rates"></div>
     <p class="hint" id="ratesEmpty">Студии появятся после первой синхронизации с календарём.</p>
-    <p class="hint">Под ставкой можно указать точку студии: она попадёт в уведомление строкой «На Маркова». Если в событии календаря указано место, в уведомлении будет оно.</p>
     <div class="row"><button class="chip" id="btnClearPay" type="button">Очистить заработок</button></div>
     <p class="hint">Стирает все ставки и суммы по дням, чтобы внести их заново.</p>
 
