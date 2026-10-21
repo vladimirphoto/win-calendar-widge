@@ -1,8 +1,7 @@
 // Откуда виджет берёт обновления: GitHub Release с тегом `tag` в репозитории `repo`.
-// Это отдельный ПУБЛИЧНЫЙ репозиторий только с готовыми exe (исходного кода в нём нет),
-// сюда релизы публикует GitHub Actions из приватного репозитория с кодом.
+// Основной репозиторий публичный, поэтому токены не нужны: Actions кладёт exe в его Release `latest`.
 module.exports = {
-  repo: 'vladimirphoto/win-calendar-widget-releases',
+  repo: 'vladimirphoto/win-calendar-widge',
   tag: 'latest',
   asset: 'CalendarWidget.exe'
 };
