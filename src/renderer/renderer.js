@@ -27,6 +27,8 @@ const sameMonth = (a, b) => a.getFullYear() === b.getFullYear() && a.getMonth() 
 
 let dayPay = {};          // сумма за конкретный день: 'YYYY-MM-DD|цвет' -> ₸ (заменяет ставку студии)
 let payTimer = 0;
+let advance = {};          // аванс: 'YYYY-MM|first|second' -> ₸
+let advTimer = 0;
 let agEvs = [];
 const money = n => Math.round(n).toLocaleString('ru-RU') + ' ₸';
 const rateKey = c => (c || 'none').toLowerCase();
@@ -189,6 +191,7 @@ function render() {
   let sub = n ? `${n} ${plural(n, 'смена', 'смены', 'смен')}` : '';
   $('sub').textContent = sub;
   updateEarn();
+  renderAdv();
   renderAgenda();
   renderSeg();
   fitWindow();
@@ -215,16 +218,41 @@ function monthShifts() {
 const PAY_POS = { month: 0, first: 1, second: 2 };
 const payPeriod = () => (settings?.payPeriod in PAY_POS ? settings.payPeriod : 'month');
 
+const pad2 = n => String(n).padStart(2, '0');
+const advKey = half => `${view.getFullYear()}-${pad2(view.getMonth() + 1)}|${half}`;
+const advFor = half => advance[advKey(half)] || 0;
+
 function updateEarn() {
   const period = payPeriod();
   const list = monthShifts().filter(e => period === 'month' || (period === 'first') === (e.start.getDate() <= 15));
   const earn = list.reduce((sum, e) => sum + payFor(e), 0);
+  const adv = period === 'month' ? advFor('first') + advFor('second') : advFor(period);
   const earnEl = $('earn');
-  const showEarn = list.length > 0 && earn > 0;
+  const showEarn = (list.length > 0 && earn > 0) || adv > 0;
   const lastDay = new Date(view.getFullYear(), view.getMonth() + 1, 0).getDate();
   const label = period === 'first' ? 'Заработок 1–15' : period === 'second' ? `Заработок 16–${lastDay}` : 'Заработок';
-  if (showEarn) earnEl.textContent = label + ': ' + money(earn);
+  if (showEarn) {
+    const main = document.createElement('span'); main.textContent = label + ': ' + money(earn);
+    const kids = [main];
+    if (adv > 0) {
+      const line = document.createElement('span'); line.className = 'adv';
+      line.textContent = `аванс −${money(adv)} · к выплате ${money(earn - adv)}`;
+      kids.push(line);
+    }
+    const sig = kids.map(k => k.textContent).join('\n');
+    if (earnEl.dataset.sig !== sig) { earnEl.replaceChildren(...kids); earnEl.dataset.sig = sig; }
+  }
   if (earnEl.hidden === showEarn) earnEl.hidden = !showEarn;
+}
+
+// поля аванса в настройках показывают открытый сейчас месяц
+function renderAdv() {
+  $('advMonth').textContent = view.toLocaleDateString('ru', { month: 'long', year: 'numeric' }).replace(/\s*г\.$/, '');
+  for (const half of ['first', 'second']) {
+    const inp = $(half === 'first' ? 'fAdvFirst' : 'fAdvSecond');
+    if (document.activeElement === inp) continue;
+    const v = advFor(half); inp.value = v ? String(v) : '';
+  }
 }
 
 function renderAgenda() {
@@ -341,6 +369,7 @@ function applySettings(s) {
   document.documentElement.style.setProperty('--glass-sat', String(+(1 + 0.8 * Math.min(1, gb / 20)).toFixed(2)));
   if (document.activeElement !== $('fBlur')) $('fBlur').value = s.glassBlur ?? 20;
   renderPaySeg();
+  if (!advTimer) advance = { ...(s.advance || {}) };
   if (!payTimer) dayPay = { ...(s.dayPay || {}) }; // пока человек вводит сумму, локальные значения главнее
   document.documentElement.style.setProperty('--alpha', String(s.opacity));
   document.body.classList.toggle('locked', !!s.locked);
@@ -570,6 +599,21 @@ $('themeSeg').addEventListener('click', e => {
   const b = e.target.closest('button[data-theme]');
   if (b) api.setSettings({ theme: b.dataset.theme });
 });
+function flushAdv() {
+  clearTimeout(advTimer); advTimer = 0;
+  api.setSettings({ advance });
+}
+for (const id of ['fAdvFirst', 'fAdvSecond']) {
+  $(id).addEventListener('input', () => {
+    const inp = $(id), key = advKey(inp.dataset.half);
+    const n = Math.max(0, Math.min(1e9, Math.round(Number(inp.value) || 0)));
+    if (n > 0) advance[key] = n; else delete advance[key];
+    updateEarn();
+    clearTimeout(advTimer);
+    advTimer = setTimeout(flushAdv, 600);
+  });
+  $(id).addEventListener('change', () => { if (advTimer) flushAdv(); });
+}
 $('paySeg').addEventListener('click', e => {
   const b = e.target.closest('button[data-period]');
   if (b) api.setSettings({ payPeriod: b.dataset.period });
@@ -624,7 +668,8 @@ $('btnClearPay').onclick = async () => {
   clearTimeout(clearArmed); clearArmed = 0; b.textContent = 'Очистить заработок';
   clearTimeout(payTimer); payTimer = 0;
   dayPay = {};
-  await api.setSettings({ rates: {}, dayPay: {} });
+  clearTimeout(advTimer); advTimer = 0; advance = {};
+  await api.setSettings({ rates: {}, dayPay: {}, advance: {} });
   renderRates();
   render();
 };

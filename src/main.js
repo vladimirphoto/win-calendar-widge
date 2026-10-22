@@ -37,6 +37,7 @@ const DEFAULTS = {
   notifyHours: 2,  // за сколько часов
   dayPay: {},      // сумма за конкретный день и студию: { '2026-10-22|#0b8043': 12000 }, заменяет ставку по умолчанию
   rates: {},       // ставка за смену по студиям: { '#0b8043': 25000 }, ключ = цвет метки
+  advance: {},     // аванс по половинам месяца: { '2026-10|first': 50000, '2026-10|second': 30000 }, вычитается из заработка
   payPeriod: 'month', // за какой период показывать заработок: 'month' весь месяц | 'first' 1–15 | 'second' 16–конец
   theme: 'system', // 'system' | 'light' | 'dark' | 'glass'
   glassBlur: 20,   // размытие обоев под «Стеклом», px
@@ -104,6 +105,7 @@ function loadSettings() {
   settings = { ...DEFAULTS, ...rest };
   if (!settings.rates || typeof settings.rates !== 'object' || Array.isArray(settings.rates)) settings.rates = {};
   if (!['month', 'first', 'second'].includes(settings.payPeriod)) settings.payPeriod = 'month';
+  if (!settings.advance || typeof settings.advance !== 'object' || Array.isArray(settings.advance)) settings.advance = {};
   delete settings.scale; // убрано: размер виджета не настраивается
   delete settings.studioNames; // убрано: имя задаётся одним полем «Что считать сменой»
   if (!settings.dayPay || typeof settings.dayPay !== 'object' || Array.isArray(settings.dayPay)) settings.dayPay = {};
@@ -627,6 +629,15 @@ function updateSettings(patch) {
       if (/^(#[0-9a-f]{3,8}|none)$/i.test(k) && isFinite(n) && n > 0 && n <= 1e9) rates[k.toLowerCase()] = n;
     }
     next.rates = rates;
+  }
+  if (patch.advance && typeof patch.advance === 'object' && !Array.isArray(patch.advance)) {
+    const entries = [];
+    for (const [k, v] of Object.entries(patch.advance)) {
+      const n = Math.round(Number(v));
+      if (/^\d{4}-(0[1-9]|1[0-2])\|(first|second)$/.test(k) && isFinite(n) && n > 0 && n <= 1e9) entries.push([k, n]);
+    }
+    entries.sort((a, b) => (a[0] < b[0] ? 1 : -1)); // новые месяцы первыми
+    next.advance = Object.fromEntries(entries.slice(0, 120));
   }
   if (patch.dayPay && typeof patch.dayPay === 'object' && !Array.isArray(patch.dayPay)) {
     const entries = [];

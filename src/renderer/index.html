@@ -105,7 +105,18 @@
     <div id="rates"></div>
     <p class="hint" id="ratesEmpty">Студии появятся после первой синхронизации с календарём.</p>
     <div class="row"><button class="chip" id="btnClearPay" type="button">Очистить заработок</button></div>
-    <p class="hint">Стирает все ставки и суммы по дням, чтобы внести их заново.</p>
+    <p class="hint">Стирает все ставки, суммы по дням и авансы, чтобы внести их заново.</p>
+
+    <h3 class="sect">Аванс</h3>
+    <p class="hint">Аванс за месяц, который сейчас открыт в календаре (<b id="advMonth"></b>). Он вычитается из заработка: над списком дня появится строка «к выплате». Пустое поле = аванса не было.</p>
+    <div class="rate">
+      <label class="nm" for="fAdvFirst">Аванс за 1–15</label>
+      <span class="fld"><input id="fAdvFirst" type="number" min="0" max="1000000000" step="1000" inputmode="numeric" placeholder="0" data-half="first"><i class="suf">₸</i></span>
+    </div>
+    <div class="rate">
+      <label class="nm" for="fAdvSecond">Аванс за 16–конец</label>
+      <span class="fld"><input id="fAdvSecond" type="number" min="0" max="1000000000" step="1000" inputmode="numeric" placeholder="0" data-half="second"><i class="suf">₸</i></span>
+    </div>
 
     <h3 class="sect">Уведомления</h3>
     <div class="toggle"><span>Напоминать о смене (уведомление Windows)</span><label class="sw"><input type="checkbox" id="tNotify"><b></b></label></div>
