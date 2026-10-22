@@ -37,6 +37,11 @@ const DEFAULTS = {
   notifyHours: 2,  // за сколько часов
   dayPay: {},      // сумма за конкретный день и студию: { '2026-10-22|#0b8043': 12000 }, заменяет ставку по умолчанию
   rates: {},       // ставка за смену по студиям: { '#0b8043': 25000 }, ключ = цвет метки
+  goalOn: false,   // панель «цель по заработку»
+  goal: 0,         // цель на месяц, ₸ (0 = не задана)
+  statsOn: false,  // панель «статистика по студиям»
+  freeOn: false,   // подсветка серий свободных дней
+  freeMin: 3,      // от скольких дней подряд считать серию
   advance: {},     // аванс по половинам месяца: { '2026-10|first': 50000, '2026-10|second': 30000 }, вычитается из заработка
   payPeriod: 'month', // за какой период показывать заработок: 'month' весь месяц | 'first' 1–15 | 'second' 16–конец
   theme: 'system', // 'system' | 'light' | 'dark' | 'glass'
@@ -609,7 +614,7 @@ function applyWindowBehavior() {
 function updateSettings(patch) {
   const next = { ...settings };
   if (typeof patch.keywords === 'string') next.keywords = patch.keywords.slice(0, 200);
-  for (const k of ['autostart', 'alwaysOnTop', 'locked', 'onlyMine', 'notify', 'autoUpdate']) {
+  for (const k of ['autostart', 'alwaysOnTop', 'locked', 'onlyMine', 'notify', 'autoUpdate', 'goalOn', 'statsOn', 'freeOn']) {
     if (typeof patch[k] === 'boolean') next[k] = patch[k];
   }
   if (typeof patch.opacity === 'number' && isFinite(patch.opacity)) {
@@ -620,6 +625,8 @@ function updateSettings(patch) {
   }
   if (['system', 'light', 'dark', 'glass'].includes(patch.theme)) next.theme = patch.theme;
   if (['month', 'first', 'second'].includes(patch.payPeriod)) next.payPeriod = patch.payPeriod;
+  if (typeof patch.goal === 'number' && isFinite(patch.goal)) next.goal = Math.min(1e9, Math.max(0, Math.round(patch.goal)));
+  if (typeof patch.freeMin === 'number' && isFinite(patch.freeMin)) next.freeMin = Math.min(7, Math.max(2, Math.round(patch.freeMin)));
   if (typeof patch.glassBlur === 'number' && isFinite(patch.glassBlur)) next.glassBlur = Math.min(40, Math.max(0, Math.round(patch.glassBlur)));
   if (typeof patch.notifyEve === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(patch.notifyEve)) next.notifyEve = patch.notifyEve;
   if (patch.rates && typeof patch.rates === 'object' && !Array.isArray(patch.rates)) {

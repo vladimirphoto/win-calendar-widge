@@ -34,6 +34,8 @@
   <div class="dows" id="dows"></div>
   <div class="days" id="days"></div>
 
+  <section class="ins" id="ins" hidden></section>
+
   <section class="agenda">
     <div class="agh"><h3 id="agTitle"></h3><div class="earn" id="earn" hidden></div></div>
     <div class="list" id="agList"></div>
@@ -117,6 +119,21 @@
       <label class="nm" for="fAdvSecond">Аванс за 16–конец</label>
       <span class="fld"><input id="fAdvSecond" type="number" min="0" max="1000000000" step="1000" inputmode="numeric" placeholder="0" data-half="second"><i class="suf">₸</i></span>
     </div>
+
+    <h3 class="sect">Панели в календаре</h3>
+    <p class="hint">Дополнительные блоки под сеткой месяца. Работают по вашим сменам, поэтому нужно имя в поле «Что считать сменой».</p>
+    <div class="toggle"><span>Цель по заработку на месяц</span><label class="sw"><input type="checkbox" id="tGoal"><b></b></label></div>
+    <div class="rate" id="rGoal" hidden>
+      <label class="nm" for="fGoal">Цель на месяц</label>
+      <span class="fld"><input id="fGoal" type="number" min="0" max="1000000000" step="10000" inputmode="numeric" placeholder="0"><i class="suf">₸</i></span>
+    </div>
+    <div class="toggle"><span>Статистика по студиям за месяц</span><label class="sw"><input type="checkbox" id="tStats"><b></b></label></div>
+    <div class="toggle"><span>Свободные дни подряд</span><label class="sw"><input type="checkbox" id="tFree"><b></b></label></div>
+    <div class="rate" id="rFree" hidden>
+      <label class="nm" for="fFreeMin">Показывать серии от</label>
+      <span class="fld"><input id="fFreeMin" type="number" min="2" max="7" step="1" inputmode="numeric"><i class="suf">дн</i></span>
+    </div>
+    <p class="hint">Свободные дни: дни без ваших смен, начиная с сегодняшнего, отмечаются пунктирной рамкой, а под сеткой написано, когда они.</p>
 
     <h3 class="sect">Уведомления</h3>
     <div class="toggle"><span>Напоминать о смене (уведомление Windows)</span><label class="sw"><input type="checkbox" id="tNotify"><b></b></label></div>

@@ -156,6 +156,7 @@ function render() {
   const start = new Date(first); start.setDate(1 - ((first.getDay() + 6) % 7));
   const todayK = ymd(new Date()), selK = ymd(sel);
   const clean = isClean(); // имя не заполнено: никаких отметок смен и точек
+  const freeSet = settings?.freeOn && !clean ? new Set(freeRuns().flat().map(ymd)) : null;
   let html = '';
   for (let i = 0; i < 42; i++) {
     const d = new Date(start); d.setDate(start.getDate() + i);
@@ -163,6 +164,7 @@ function render() {
     const cls = ['day'];
     if (d.getMonth() !== view.getMonth()) cls.push('other');
     if (evs.some(e => e.shift)) cls.push('shift');
+    else if (freeSet && freeSet.has(k)) cls.push('free');
     if (k === todayK) cls.push('today');
     if (k === selK) cls.push('sel');
     // цвета студий (смен) за день без повторов
@@ -192,6 +194,7 @@ function render() {
   $('sub').textContent = sub;
   updateEarn();
   renderAdv();
+  renderInsights();
   renderAgenda();
   renderSeg();
   fitWindow();
@@ -253,6 +256,90 @@ function renderAdv() {
     if (document.activeElement === inp) continue;
     const v = advFor(half); inp.value = v ? String(v) : '';
   }
+}
+
+/* ---------- панели под сеткой: цель, студии, свободные дни ---------- */
+const mk = (tag, cls, text) => { const el = document.createElement(tag); if (cls) el.className = cls; if (text !== undefined) el.textContent = text; return el; };
+
+// серии подряд идущих дней без моих смен (в сетке месяца, от сегодняшнего дня), не короче settings.freeMin
+function freeRuns() {
+  const min = Math.min(7, Math.max(2, settings?.freeMin || 3));
+  const first = new Date(view.getFullYear(), view.getMonth(), 1);
+  const start = new Date(first); start.setDate(1 - ((first.getDay() + 6) % 7));
+  const todayK = ymd(new Date());
+  const runs = []; let cur = [];
+  const flush = () => { if (cur.length >= min) runs.push(cur); cur = []; };
+  for (let i = 0; i < 42; i++) {
+    const d = new Date(start); d.setDate(start.getDate() + i);
+    const k = ymd(d);
+    if (k >= todayK && !(events[k] || []).some(e => e.shift)) cur.push(d); else flush();
+  }
+  flush();
+  return runs;
+}
+const shortDate = d => d.toLocaleDateString('ru', { day: 'numeric', month: 'short' }).replace('.', '');
+function runLabel(run) {
+  const a = run[0], b = run[run.length - 1], n = run.length;
+  const span = sameMonth(a, b) ? `${a.getDate()}–${shortDate(b)}` : `${shortDate(a)} – ${shortDate(b)}`;
+  return `${span} (${n} ${plural(n, 'день', 'дня', 'дней')})`;
+}
+
+function renderInsights() {
+  const box = $('ins');
+  const kids = [];
+  if (!isClean()) {
+    const list = monthShifts();
+    if (settings?.goalOn && settings.goal > 0) {
+      const goal = settings.goal, now = Date.now();
+      const planned = list.reduce((s, e) => s + payFor(e), 0);
+      const done = list.filter(e => e.end.getTime() <= now).reduce((s, e) => s + payFor(e), 0);
+      const wrap = mk('div');
+      const gt = mk('div', 'gt');
+      const l = mk('span'); l.append('Набрано ', mk('b', '', money(done)), ' из ' + money(goal));
+      gt.append(l, mk('span', '', done >= goal ? 'цель достигнута' : 'осталось ' + money(goal - done)));
+      const bar = mk('div', 'gbar');
+      bar.title = `С запланированными сменами: ${money(planned)}`;
+      const gp = mk('i', 'gp'); gp.style.width = Math.min(100, planned / goal * 100) + '%';
+      const gd = mk('i', 'gd'); gd.style.width = Math.min(100, done / goal * 100) + '%';
+      bar.append(gp, gd);
+      wrap.append(gt, bar);
+      kids.push(wrap);
+    }
+    if (settings?.statsOn) {
+      const names = new Map(studiosList().map(s => [s.key, s]));
+      const by = new Map();
+      for (const e of list) {
+        const k = rateKey(e.color);
+        const it = by.get(k) || { k, n: 0, sum: 0 };
+        it.n++; it.sum += payFor(e); by.set(k, it);
+      }
+      const rows = [...by.values()].sort((a, b) => b.sum - a.sum || b.n - a.n);
+      if (rows.length) {
+        const wrap = mk('div');
+        wrap.append(mk('div', 'sh', 'Студии за месяц'));
+        for (const r of rows) {
+          const st = names.get(r.k);
+          const row = mk('div', 'st');
+          const dot = mk('i'); if (st?.color) dot.style.background = st.color;
+          const nm = mk('span', 'n', st?.name || 'Без названия'); nm.title = nm.textContent;
+          row.append(dot, nm, mk('span', 'c', `${r.n} ${plural(r.n, 'смена', 'смены', 'смен')}`), mk('span', 'm', r.sum > 0 ? money(r.sum) : '—'));
+          wrap.append(row);
+        }
+        kids.push(wrap);
+      }
+    }
+    if (settings?.freeOn) {
+      const runs = freeRuns().filter(r => r.some(d => sameMonth(d, view)));
+      const p = mk('div', 'fr2');
+      if (runs.length) {
+        p.append(mk('b', '', 'Свободно: '), runs.slice(0, 3).map(runLabel).join(' · ') + (runs.length > 3 ? ' …' : ''));
+      } else p.textContent = `Серий свободных дней от ${settings.freeMin || 3} подряд нет`;
+      kids.push(p);
+    }
+  }
+  const sig = kids.map(k => k.outerHTML).join('');
+  if (box.dataset.sig !== sig) { box.replaceChildren(...kids); box.dataset.sig = sig; }
+  if (box.hidden === (kids.length > 0)) box.hidden = !kids.length;
 }
 
 function renderAgenda() {
@@ -380,6 +467,11 @@ function applySettings(s) {
   $('tLock').checked = !!s.locked;
   $('tOnly').checked = !!s.onlyMine;
   $('devNote').hidden = !!s.packaged;
+  $('tGoal').checked = !!s.goalOn; $('rGoal').hidden = !s.goalOn;
+  $('tStats').checked = !!s.statsOn;
+  $('tFree').checked = !!s.freeOn; $('rFree').hidden = !s.freeOn;
+  if (document.activeElement !== $('fGoal')) $('fGoal').value = s.goal > 0 ? String(s.goal) : '';
+  if (document.activeElement !== $('fFreeMin')) $('fFreeMin').value = s.freeMin || 3;
   $('tNotify').checked = !!s.notify;
   $('tAutoUpd').checked = !!s.autoUpdate;
   renderUpdate();
@@ -673,6 +765,18 @@ $('btnClearPay').onclick = async () => {
   renderRates();
   render();
 };
+$('tGoal').onchange = () => api.setSettings({ goalOn: $('tGoal').checked });
+$('tStats').onchange = () => api.setSettings({ statsOn: $('tStats').checked });
+$('tFree').onchange = () => api.setSettings({ freeOn: $('tFree').checked });
+let panelsTimer;
+$('fGoal').addEventListener('input', () => {
+  clearTimeout(panelsTimer);
+  panelsTimer = setTimeout(() => api.setSettings({ goal: Math.max(0, Number($('fGoal').value) || 0) }), 500);
+});
+$('fFreeMin').addEventListener('input', () => {
+  clearTimeout(panelsTimer);
+  panelsTimer = setTimeout(() => { const n = Number($('fFreeMin').value); if (n >= 2) api.setSettings({ freeMin: n }); }, 500);
+});
 $('tNotify').onchange = () => api.setSettings({ notify: $('tNotify').checked });
 $('fNotifyEve').addEventListener('change', () => { if ($('fNotifyEve').value) api.setSettings({ notifyEve: $('fNotifyEve').value }); });
 let notifyTimer;
