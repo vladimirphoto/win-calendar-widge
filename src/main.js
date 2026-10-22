@@ -39,6 +39,7 @@ const DEFAULTS = {
   notifyHours: 2,  // за сколько часов
   dayPay: {},      // сумма за конкретный день и студию: { '2026-10-22|#0b8043': 12000 }, заменяет ставку по умолчанию
   rates: {},       // ставка за смену по студиям: { '#0b8043': 25000 }, ключ = цвет метки
+  surprise: true,  // пасхалка: конфетти в день выплаты (1 и 15) и по быстрым кликам на название месяца
   goalOn: false,   // панель «цель по заработку»
   goal: 0,         // цель на месяц, ₸ (0 = не задана)
   statsOn: false,  // панель «статистика по студиям»
@@ -625,7 +626,7 @@ function applyWindowBehavior() {
 function updateSettings(patch) {
   const next = { ...settings };
   if (typeof patch.keywords === 'string') next.keywords = patch.keywords.slice(0, 200);
-  for (const k of ['autostart', 'alwaysOnTop', 'locked', 'onlyMine', 'notify', 'autoUpdate', 'goalOn', 'statsOn', 'freeOn']) {
+  for (const k of ['autostart', 'alwaysOnTop', 'locked', 'onlyMine', 'notify', 'autoUpdate', 'goalOn', 'statsOn', 'freeOn', 'surprise']) {
     if (typeof patch[k] === 'boolean') next[k] = patch[k];
   }
   if (typeof patch.opacity === 'number' && isFinite(patch.opacity)) {

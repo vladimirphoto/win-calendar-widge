@@ -470,6 +470,7 @@ function applySettings(s) {
   $('tGoal').checked = !!s.goalOn; $('rGoal').hidden = !s.goalOn;
   $('tStats').checked = !!s.statsOn;
   $('tFree').checked = !!s.freeOn; $('rFree').hidden = !s.freeOn;
+  $('tFun').checked = s.surprise !== false;
   if (document.activeElement !== $('fGoal')) $('fGoal').value = s.goal > 0 ? String(s.goal) : '';
   if (document.activeElement !== $('fFreeMin')) $('fFreeMin').value = s.freeMin || 3;
   $('tNotify').checked = !!s.notify;
@@ -826,6 +827,7 @@ $('btnClearPay').onclick = async () => {
 };
 $('tGoal').onchange = () => api.setSettings({ goalOn: $('tGoal').checked });
 $('tStats').onchange = () => api.setSettings({ statsOn: $('tStats').checked });
+$('tFun').onchange = () => api.setSettings({ surprise: $('tFun').checked });
 $('tFree').onchange = () => api.setSettings({ freeOn: $('tFree').checked });
 let panelsTimer;
 $('fGoal').addEventListener('input', () => {
@@ -852,6 +854,58 @@ api.onSettings(applySettings);
 api.onAuthChanged(v => { loggedIn = v; if (!v) { demo = true; upcoming = []; events = indexEvents(demoEvents()); setStatus('', 'Не подключено'); } updateButtons(); render(); updateNext(true); });
 
 /* ---------- старт ---------- */
+/* ---------- сюрприз: конфетти ---------- */
+// в день выплаты (1 и 15 число) при первом открытии за день, а также если быстро кликнуть 5 раз на название месяца
+let fxBusy = false;
+function confetti() {
+  if (fxBusy || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  fxBusy = true;
+  const card = $('card');
+  const cv = document.createElement('canvas');
+  cv.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:30;border-radius:inherit';
+  const w = cv.width = card.clientWidth, h = cv.height = card.clientHeight;
+  card.append(cv);
+  const ctx = cv.getContext('2d');
+  const cs = getComputedStyle(document.documentElement);
+  const colors = [cs.getPropertyValue('--accent').trim() || '#0067c0', cs.getPropertyValue('--shift').trim() || '#0b6f61', '#f7b500', '#e5484d', '#8e5cf0', '#2bb6a3'];
+  const parts = Array.from({ length: 110 }, () => ({
+    x: w * (0.15 + Math.random() * 0.7), y: -10 - Math.random() * h * 0.35,
+    vx: (Math.random() - 0.5) * 3.2, vy: 1.6 + Math.random() * 2.6,
+    s: 4 + Math.random() * 5, r: Math.random() * Math.PI, vr: (Math.random() - 0.5) * 0.3,
+    c: colors[(Math.random() * colors.length) | 0]
+  }));
+  const t0 = performance.now(), DUR = 2600;
+  let raf = 0;
+  const stop = () => { cancelAnimationFrame(raf); cv.remove(); fxBusy = false; };
+  const tick = now => {
+    const k = (now - t0) / DUR;
+    if (k >= 1 || !cv.isConnected) return stop();
+    ctx.clearRect(0, 0, w, h);
+    ctx.globalAlpha = k > 0.75 ? (1 - k) / 0.25 : 1;
+    for (const p of parts) {
+      p.x += p.vx; p.y += p.vy; p.vy += 0.035; p.r += p.vr;
+      ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.r); ctx.fillStyle = p.c;
+      ctx.fillRect(-p.s / 2, -p.s / 4, p.s, p.s / 2); ctx.restore();
+    }
+    raf = requestAnimationFrame(tick);
+  };
+  raf = requestAnimationFrame(tick);
+}
+let titleClicks = [];
+$('title').addEventListener('click', () => {
+  if (settings?.surprise === false) return;
+  const now = Date.now();
+  titleClicks = titleClicks.filter(t => now - t < 2000).concat(now);
+  if (titleClicks.length >= 5) { titleClicks = []; confetti(); }
+});
+function paydayConfetti() {
+  if (settings?.surprise === false) return;
+  const d = new Date(); if (d.getDate() !== 1 && d.getDate() !== 15) return;
+  const k = ymd(d);
+  try { if (localStorage.getItem('payday-fx') === k) return; localStorage.setItem('payday-fx', k); } catch {}
+  setTimeout(confetti, 700);
+}
+
 (async function init() {
   applyAccent(await api.getAccent());
   events = indexEvents(demoEvents());
@@ -860,6 +914,7 @@ api.onAuthChanged(v => { loggedIn = v; if (!v) { demo = true; upcoming = []; eve
   updateButtons();
   render();
   api.updateState().then(s => { upd = s; renderUpdate(); });
+  paydayConfetti();
   if (loggedIn) { await sync(); }
   else setStatus('', 'Не подключено');
   // автообновление данных раз в 10 минут
