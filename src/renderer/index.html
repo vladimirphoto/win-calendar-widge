@@ -71,10 +71,12 @@
       </div>
     </div>
 
+    <p class="err" id="cfgErr" hidden></p>
+
     <div class="field">
-      <label for="fKeys">Что считать сменой (слова в названии)</label>
-      <input id="fKeys" type="text" placeholder="ваше имя, как в названии смены" spellcheck="false">
-      <p class="hint">Впишите своё имя так, как оно написано в названиях смен (можно несколько слов через запятую). Пока поле пустое, виджет остаётся чистым календарём: без отметок смен, заработка и напоминаний. Чтобы скрыть чужие смены, включите «Показывать только мои смены».</p>
+      <label for="fKeys">Что считать сменой</label>
+      <input id="fKeys" type="text" placeholder="Ваше имя, как в названии смены" spellcheck="false">
+      <p class="hint">Слова через запятую. Пока пусто, это обычный календарь без смен.</p>
     </div>
 
     <div class="field" id="opacityField">
@@ -82,94 +84,113 @@
       <input id="fOpacity" type="range" min="40" max="100" step="2">
     </div>
     <div class="field" id="glassField" hidden>
-      <label for="fBlur">Стекло: прозрачность</label>
+      <label for="fBlur">Размытие стекла</label>
       <input id="fBlur" type="range" min="0" max="40" step="1">
     </div>
 
-    <div class="toggle"><span>Запускать при старте Windows</span><label class="sw"><input type="checkbox" id="tAuto"><b></b></label></div>
-    <div class="toggle"><span>Показывать только мои смены</span><label class="sw"><input type="checkbox" id="tOnly"><b></b></label></div>
+    <div class="toggle"><span>Автозапуск с Windows</span><label class="sw"><input type="checkbox" id="tAuto"><b></b></label></div>
+    <div class="toggle"><span>Только мои смены</span><label class="sw"><input type="checkbox" id="tOnly"><b></b></label></div>
     <div class="toggle"><span>Поверх всех окон</span><label class="sw"><input type="checkbox" id="tTop"><b></b></label></div>
     <div class="toggle"><span>Закрепить положение</span><label class="sw"><input type="checkbox" id="tLock"><b></b></label></div>
-    <p class="hint" id="devNote" hidden>Автозапуск работает только в установленной версии (после npm run dist).</p>
+    <p class="hint" id="devNote" hidden>Автозапуск работает только в собранном exe.</p>
 
-    <h3 class="sect">Заработок</h3>
-    <div class="field">
-      <label>Показывать заработок за</label>
-      <div class="seg seg3 seg-txt" id="paySeg" data-pos="0" role="group" aria-label="Период заработка">
-        <i class="thumb" aria-hidden="true"></i>
-        <button type="button" data-period="month">Весь месяц</button>
-        <button type="button" data-period="first">1–15</button>
-        <button type="button" data-period="second">16–конец</button>
+    <details class="grp">
+      <summary>Заработок</summary>
+      <div class="field">
+        <label>Показывать за</label>
+        <div class="seg seg3 seg-txt" id="paySeg" data-pos="0" role="group" aria-label="Период заработка">
+          <i class="thumb" aria-hidden="true"></i>
+          <button type="button" data-period="month">Месяц</button>
+          <button type="button" data-period="first">1–15</button>
+          <button type="button" data-period="second">16–конец</button>
+        </div>
+        <p class="hint">Смены 1–15 оплачивают 15-го, 16–конец — 1-го следующего месяца.</p>
       </div>
-      <p class="hint">«1–15» — смены с 1 по 15 число, их оплата приходит 15-го этого же месяца. «16–конец» — смены с 16 числа до конца месяца, оплата приходит 1-го следующего месяца. Сумма стоит справа от даты.</p>
-    </div>
-    <p class="hint">Ставка по умолчанию за одну смену в тенге, отдельно для каждой студии. Если в какой-то день вы заработали другую сумму, впишите её в карточке смены этого дня: она заменит ставку. Считаются только ваши смены; сумма за месяц стоит справа от даты. Под названием студии показано ваше имя из поля «Что считать сменой».</p>
-    <div id="rates"></div>
-    <p class="hint" id="ratesEmpty">Студии появятся после первой синхронизации с календарём.</p>
-    <div class="row"><button class="chip" id="btnClearPay" type="button">Очистить заработок</button></div>
-    <p class="hint">Стирает все ставки, суммы по дням и авансы, чтобы внести их заново.</p>
+      <p class="hint">Ставка за смену по студиям. Другую сумму для дня впишите в карточке смены.</p>
+      <div id="rates"></div>
+      <p class="hint" id="ratesEmpty">Студии появятся после входа в Google.</p>
+      <div class="row"><button class="chip" id="btnClearPay" type="button">Очистить заработок</button></div>
+      <p class="hint">Сотрёт ставки, суммы по дням и авансы.</p>
+    </details>
 
-    <h3 class="sect">Аванс</h3>
-    <p class="hint">Аванс за месяц, который сейчас открыт в календаре (<b id="advMonth"></b>). Он вычитается из заработка: над списком дня появится строка «к выплате». Пустое поле = аванса не было.</p>
-    <div class="rate">
-      <label class="nm" for="fAdvFirst">Аванс за 1–15</label>
-      <span class="fld"><input id="fAdvFirst" type="number" min="0" max="1000000000" step="1000" inputmode="numeric" placeholder="0" data-half="first"><i class="suf">₸</i></span>
-    </div>
-    <div class="rate">
-      <label class="nm" for="fAdvSecond">Аванс за 16–конец</label>
-      <span class="fld"><input id="fAdvSecond" type="number" min="0" max="1000000000" step="1000" inputmode="numeric" placeholder="0" data-half="second"><i class="suf">₸</i></span>
-    </div>
+    <details class="grp">
+      <summary>Аванс</summary>
+      <p class="hint">За месяц в календаре (<b id="advMonth"></b>). Вычитается из заработка.</p>
+      <div class="rate">
+        <label class="nm" for="fAdvFirst">За 1–15</label>
+        <span class="fld"><input id="fAdvFirst" type="number" min="0" max="1000000000" step="1000" inputmode="numeric" placeholder="0" data-half="first"><i class="suf">₸</i></span>
+      </div>
+      <div class="rate">
+        <label class="nm" for="fAdvSecond">За 16–конец</label>
+        <span class="fld"><input id="fAdvSecond" type="number" min="0" max="1000000000" step="1000" inputmode="numeric" placeholder="0" data-half="second"><i class="suf">₸</i></span>
+      </div>
+    </details>
 
-    <h3 class="sect">Панели в календаре</h3>
-    <p class="hint">Дополнительные блоки под сеткой месяца. Работают по вашим сменам, поэтому нужно имя в поле «Что считать сменой».</p>
-    <div class="toggle"><span>Цель по заработку на месяц</span><label class="sw"><input type="checkbox" id="tGoal"><b></b></label></div>
-    <div class="rate" id="rGoal" hidden>
-      <label class="nm" for="fGoal">Цель на месяц</label>
-      <span class="fld"><input id="fGoal" type="number" min="0" max="1000000000" step="10000" inputmode="numeric" placeholder="0"><i class="suf">₸</i></span>
-    </div>
-    <div class="toggle"><span>Статистика по студиям за месяц</span><label class="sw"><input type="checkbox" id="tStats"><b></b></label></div>
-    <div class="toggle"><span>Свободные дни подряд</span><label class="sw"><input type="checkbox" id="tFree"><b></b></label></div>
-    <div class="rate" id="rFree" hidden>
-      <label class="nm" for="fFreeMin">Показывать серии от</label>
-      <span class="fld"><input id="fFreeMin" type="number" min="2" max="7" step="1" inputmode="numeric"><i class="suf">дн</i></span>
-    </div>
-    <p class="hint">Свободные дни: дни без ваших смен, начиная с сегодняшнего, отмечаются пунктирной рамкой, а под сеткой написано, когда они.</p>
+    <details class="grp">
+      <summary>Панели в календаре</summary>
+      <div class="toggle"><span>Цель по заработку</span><label class="sw"><input type="checkbox" id="tGoal"><b></b></label></div>
+      <div class="rate" id="rGoal" hidden>
+        <label class="nm" for="fGoal">Цель на месяц</label>
+        <span class="fld"><input id="fGoal" type="number" min="0" max="1000000000" step="10000" inputmode="numeric" placeholder="0"><i class="suf">₸</i></span>
+      </div>
+      <div class="toggle"><span>Статистика по студиям</span><label class="sw"><input type="checkbox" id="tStats"><b></b></label></div>
+      <div class="toggle"><span>Свободные дни</span><label class="sw"><input type="checkbox" id="tFree"><b></b></label></div>
+      <div class="rate" id="rFree" hidden>
+        <label class="nm" for="fFreeMin">Серия от</label>
+        <span class="fld"><input id="fFreeMin" type="number" min="2" max="7" step="1" inputmode="numeric"><i class="suf">дн</i></span>
+      </div>
+      <p class="hint">Считаются только ваши смены. Свободные дни отмечены пунктиром.</p>
+    </details>
 
-    <h3 class="sect">Уведомления</h3>
-    <div class="toggle"><span>Напоминать о смене (уведомление Windows)</span><label class="sw"><input type="checkbox" id="tNotify"><b></b></label></div>
-    <div class="rate">
-      <label class="nm" for="fNotifyH">За сколько часов до начала</label>
-      <span class="fld"><input id="fNotifyH" type="number" min="1" max="48" step="1" inputmode="numeric"><i class="suf">ч</i></span>
-    </div>
-    <div class="rate">
-      <label class="nm" for="fNotifyEve">Накануне, для смен «на весь день»</label>
-      <span class="fld"><input id="fNotifyEve" type="time"></span>
-    </div>
-    <p class="hint" id="notifyWhen"></p>
-    <p class="hint">Нужны слова в поле «Что считать сменой», иначе напоминания не приходят.</p>
-    <div class="row"><button class="chip" id="btnNotifyTest" type="button">Уведомить сейчас</button><span class="hint" id="notifyMsg" style="margin:0;align-self:center"></span></div>
+    <details class="grp">
+      <summary>Уведомления</summary>
+      <div class="toggle"><span>Напоминать о смене</span><label class="sw"><input type="checkbox" id="tNotify"><b></b></label></div>
+      <div class="rate">
+        <label class="nm" for="fNotifyH">За сколько часов</label>
+        <span class="fld"><input id="fNotifyH" type="number" min="1" max="48" step="1" inputmode="numeric"><i class="suf">ч</i></span>
+      </div>
+      <div class="rate">
+        <label class="nm" for="fNotifyEve">Накануне (смены на весь день)</label>
+        <span class="fld"><input id="fNotifyEve" type="time"></span>
+      </div>
+      <p class="hint" id="notifyWhen"></p>
+      <div class="row"><button class="chip" id="btnNotifyTest" type="button">Проверить</button><span class="hint" id="notifyMsg" style="margin:0;align-self:center"></span></div>
+    </details>
 
-    <h3 class="sect">Google Календарь</h3>
-    <div class="row">
-      <button class="chip primary" id="btnLogin">Войти через Google</button>
-      <button class="chip" id="btnLogout">Выйти</button>
-    </div>
-    <p class="hint" id="authHint"></p>
-    <p class="err" id="cfgErr" hidden></p>
+    <details class="grp" id="gGoogle">
+      <summary>Google Календарь</summary>
+      <div class="row">
+        <button class="chip primary" id="btnLogin">Войти через Google</button>
+        <button class="chip" id="btnLogout">Выйти</button>
+      </div>
+      <p class="hint" id="authHint"></p>
+    </details>
 
-    <h3 class="sect">Обновления</h3>
-    <div class="toggle"><span>Устанавливать обновления автоматически</span><label class="sw"><input type="checkbox" id="tAutoUpd" checked><b></b></label></div>
-    <p class="hint" id="updText"></p>
-    <div class="row"><button class="chip primary" id="btnUpd">Проверить обновления</button></div>
+    <details class="grp" id="gUpd">
+      <summary>Обновления</summary>
+      <div class="toggle"><span>Автообновление</span><label class="sw"><input type="checkbox" id="tAutoUpd" checked><b></b></label></div>
+      <p class="hint" id="updText"></p>
+      <div class="row"><button class="chip primary" id="btnUpd">Проверить</button></div>
+      <div class="vers" id="vers" hidden>
+        <div class="vh">Версии</div>
+        <div id="verList"></div>
+        <div class="pinbox" id="pinBox" hidden>
+          <span id="pinText"></span>
+          <button class="chip primary" id="btnPin" type="button"></button>
+        </div>
+      </div>
+    </details>
 
-    <h3 class="sect">Данные приложения</h3>
-    <p class="hint">Перед удалением приложения: стирает настройки, ставки, кэш и вход в Google с диска, отзывает доступ в вашем аккаунте Google и убирает автозапуск. После этого виджет закроется.</p>
-    <div class="row"><button class="chip danger" id="btnWipe">Удалить все данные…</button></div>
-    <div class="confirm" id="wipeBox" hidden>
-      <p>Это нельзя отменить. Виджет закроется и ничего после себя не оставит.</p>
-      <div class="toggle" id="wipeExeRow"><span>Удалить и сам файл CalendarWidget.exe</span><label class="sw"><input type="checkbox" id="tWipeExe" checked><b></b></label></div>
-      <div class="row"><button class="chip danger solid" id="btnWipeYes">Да, удалить всё</button><button class="chip" id="btnWipeNo">Отмена</button></div>
-    </div>
+    <details class="grp">
+      <summary>Данные</summary>
+      <p class="hint">Стирает настройки, кэш и вход в Google, убирает автозапуск. Виджет закроется.</p>
+      <div class="row"><button class="chip danger" id="btnWipe">Удалить все данные…</button></div>
+      <div class="confirm" id="wipeBox" hidden>
+        <p>Это нельзя отменить.</p>
+        <div class="toggle" id="wipeExeRow"><span>Удалить и сам CalendarWidget.exe</span><label class="sw"><input type="checkbox" id="tWipeExe" checked><b></b></label></div>
+        <div class="row"><button class="chip danger solid" id="btnWipeYes">Да, удалить всё</button><button class="chip" id="btnWipeNo">Отмена</button></div>
+      </div>
+    </details>
   </section>
 </main>
 <script src="renderer.js"></script>

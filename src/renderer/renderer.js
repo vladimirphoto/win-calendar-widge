@@ -141,10 +141,10 @@ function updateButtons() {
   $('btnLogout').hidden = !loggedIn;
   $('btnLogin').hidden = loggedIn;
   $('authHint').textContent = loggedIn
-    ? 'Вы вошли. Доступ только на чтение календаря.'
+    ? 'Вы вошли. Доступ только на чтение.'
     : (settings?.customClient
-      ? 'Используется ваш Client ID из прежних настроек.'
-      : 'Откроется браузер, разрешите доступ «только чтение». Пароль виджету не передаётся.');
+      ? 'Используется ваш Client ID.'
+      : 'Откроется браузер. Доступ только на чтение.');
 }
 
 const colorOrder = [];
@@ -503,7 +503,7 @@ function renderNotifyWhen() {
   const at = new Date(2000, 0, 5, h, m) - lead * 3600e3;
   const d = new Date(at), prev = d.getDate() !== 5;
   const hhmm = `${pad(h)}:${pad(m)}`;
-  el.textContent = `Для смены в ${hhmm} напоминание придёт ${prev ? 'накануне ' : ''}в ${fmtT(d)}.`;
+  el.textContent = `Смена в ${hhmm}: напомню ${prev ? 'накануне ' : ''}в ${fmtT(d)}.`;
 }
 
 /* ---------- ставки по студиям ---------- */
@@ -720,21 +720,80 @@ function renderUpdate() {
   const v = settings?.version || upd.current || '';
   const st = upd.state, btn = $('btnUpd'), txt = $('updText');
   btn.disabled = false;
-  let t = `Версия ${v}. `;
-  if (st === 'checking') { t += 'Проверяю…'; btn.disabled = true; btn.textContent = 'Проверяю…'; }
-  else if (st === 'available') { t += `Доступна версия ${upd.latest}.`; btn.textContent = `Установить ${upd.latest} и перезапустить`; }
-  else if (st === 'downloading') { t += `Скачиваю ${upd.latest}: ${upd.progress || 0}%`; btn.disabled = true; btn.textContent = 'Скачиваю…'; }
-  else if (st === 'installing') { t += 'Перезапускаю…'; btn.disabled = true; btn.textContent = 'Перезапуск…'; }
-  else if (st === 'uptodate') { t += 'У вас последняя версия.'; btn.textContent = 'Проверить обновления'; }
-  else if (st === 'error') { t += upd.message || 'Не удалось проверить обновления.'; btn.textContent = 'Проверить ещё раз'; }
-  else if (st === 'unsupported') { t += upd.message || ''; btn.textContent = 'Проверить обновления'; btn.disabled = true; }
-  else { btn.textContent = 'Проверить обновления'; }
-  txt.textContent = t.trim();
+  let t = `Версия ${v}`, tail = '';
+  btn.textContent = 'Проверить';
+  if (st === 'checking') { tail = 'проверяю…'; btn.disabled = true; btn.textContent = 'Проверяю…'; }
+  else if (st === 'available') { tail = `доступна ${upd.latest}`; btn.textContent = `Установить ${upd.latest}`; }
+  else if (st === 'downloading') { tail = `скачиваю ${upd.latest}: ${upd.progress || 0}%`; btn.disabled = true; btn.textContent = 'Скачиваю…'; }
+  else if (st === 'installing') { tail = 'перезапуск…'; btn.disabled = true; btn.textContent = 'Перезапуск…'; }
+  else if (st === 'uptodate') tail = 'последняя';
+  else if (st === 'pinned') tail = settings?.pinKept ? 'зафиксирована' : 'пробная, обновления приостановлены';
+  else if (st === 'error') { tail = upd.message || 'не удалось проверить'; btn.textContent = 'Повторить'; }
+  else if (st === 'unsupported') { tail = upd.message || ''; btn.disabled = true; }
+  txt.textContent = tail ? `${t} · ${tail}` : t;
   txt.classList.toggle('bad', st === 'error');
+  renderVersions();
 }
 $('btnUpd').onclick = () => (upd.state === 'available' ? api.updateInstall() : api.updateCheck());
 $('tAutoUpd').onchange = () => api.setSettings({ autoUpdate: $('tAutoUpd').checked });
-api.onUpdate(s => { upd = s; renderUpdate(); });
+api.onUpdate(s => {
+  const was = upd.state; upd = s; renderUpdate();
+  if (s.state !== was && ['uptodate', 'available', 'pinned'].includes(s.state) && $('gUpd').open) loadVersions();
+});
+
+/* ---------- версии: последние 3, установка выбранной, «оставить эту» ---------- */
+let vers = null;       // ответ update:versions
+let verArmed = '';     // версия, для которой нажали «Установить» и ждём подтверждения
+let verArmTimer = 0;
+async function loadVersions() {
+  try { vers = await api.updateVersions(); } catch { vers = { ok: false, message: 'Не удалось загрузить список' }; }
+  renderVersions();
+}
+const verDate = iso => { const d = new Date(iso); return isNaN(d) ? '' : d.toLocaleDateString('ru', { day: 'numeric', month: 'short' }).replace('.', ''); };
+function renderVersions() {
+  const box = $('vers'), list = $('verList'), pin = $('pinBox');
+  if (!vers || (vers.ok && !vers.items.length)) { box.hidden = true; return; } // пока нет релизов по версиям
+  box.hidden = false;
+  list.textContent = '';
+  if (!vers.ok) { list.append(mk('p', 'hint', vers.message || 'Не удалось загрузить список')); pin.hidden = true; return; }
+  const busy = ['checking', 'downloading', 'installing'].includes(upd.state);
+  for (const it of vers.items) {
+    const row = mk('div', 'ver');
+    row.append(mk('span', 'v', it.version));
+    if (it.newest && vers.items.length > 1) row.append(mk('span', 'tag', 'новая'));
+    row.append(mk('span', 'd', verDate(it.date)));
+    if (it.current) row.append(mk('span', 'cur', 'Установлена'));
+    else {
+      const b = mk('button', 'chip', verArmed === it.version ? 'Точно? Перезапуск' : 'Установить');
+      b.type = 'button'; b.disabled = busy || !vers.canInstall;
+      b.onclick = () => {
+        if (verArmed !== it.version) {
+          verArmed = it.version; clearTimeout(verArmTimer);
+          verArmTimer = setTimeout(() => { verArmed = ''; renderVersions(); }, 4000);
+          renderVersions(); return;
+        }
+        verArmed = ''; clearTimeout(verArmTimer);
+        api.updateInstall(it.version);
+      };
+      row.append(b);
+    }
+    list.append(row);
+  }
+  // фиксация: «Оставить эту версию» (если стоит не самая новая) или «Снять фиксацию»
+  const kept = !!vers.kept;
+  const older = vers.current && vers.newest && vers.current !== vers.newest;
+  pin.hidden = !(kept || older);
+  if (!pin.hidden) {
+    $('pinText').textContent = kept ? `Версия ${vers.current} зафиксирована. Новые не ставятся.` : 'Нравится эта версия? Оставьте её, новые скроются.';
+    $('btnPin').textContent = kept ? 'Снять' : 'Оставить эту версию';
+    $('btnPin').onclick = async () => {
+      await api.updatePin(kept ? 'clear' : 'keep');
+      await loadVersions();
+      if (kept) api.updateCheck();
+    };
+  }
+}
+$('gUpd').addEventListener('toggle', () => { if ($('gUpd').open) loadVersions(); });
 
 $('btnWipe').onclick = () => { $('wipeExeRow').hidden = !settings?.canDeleteExe; $('wipeBox').hidden = false; $('btnWipe').hidden = true; $('wipeBox').scrollIntoView({ block: 'nearest' }); };
 $('btnWipeNo').onclick = () => { $('wipeBox').hidden = true; $('btnWipe').hidden = false; };
@@ -746,7 +805,7 @@ $('btnWipeYes').onclick = async () => {
 $('btnNotifyTest').onclick = async () => {
   const msg = $('notifyMsg');
   const r = await api.notifyTest();
-  msg.textContent = r?.ok ? 'Отправлено. Не видите? Проверьте режим «Не беспокоить» в Windows.' : (r?.message || 'Не удалось');
+  msg.textContent = r?.ok ? 'Отправлено. Не видно? Проверьте «Не беспокоить».' : (r?.message || 'Не удалось');
   setTimeout(() => { msg.textContent = ''; }, 8000);
 };
 let clearArmed = 0;

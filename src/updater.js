@@ -33,14 +33,64 @@ function buildSwapScript(newFile, target) {
   ].join('\r\n') + '\r\n';
 }
 
+const VER_TAG = /^v?(\d+)\.(\d+)\.(\d+)$/;
+const HEADERS = { Accept: 'application/vnd.github+json', 'User-Agent': 'CalendarWidget-updater' };
+class UErr extends Error { constructor(code, message) { super(message); this.code = code; } }
+const asErr = e => (e instanceof UErr ? e : new UErr('HTTP', String(e?.message || e)));
+
 function createUpdater(deps) {
-  const { config, getVersion, getExePath, send, fetchFn = fetch, onQuit, spawnFn = spawn } = deps;
+  const {
+    config, getVersion, getExePath, send, fetchFn = fetch, onQuit, spawnFn = spawn,
+    getPin = () => ({ version: '', kept: false }), // зафиксированная версия: { version, kept }
+    onApplied = () => {}                           // перед подменой exe: { version, rollback }
+  } = deps;
   let state = { state: 'idle', current: getVersion() };
   let busy = false;
   let found = null; // { version, asset }
+  let vcache = { at: 0, list: null };
 
   const set = patch => { state = { ...state, ...patch, current: getVersion() }; send(state); return state; };
   const supported = () => !!getExePath();
+  const errState = e => { const x = asErr(e); return set({ state: 'error', code: x.code, message: x.message }); };
+
+  // GET к GitHub API с понятными ошибками
+  async function api(url) {
+    let r;
+    try { r = await fetchFn(url, { headers: HEADERS, signal: AbortSignal.timeout(15000) }); }
+    catch { throw new UErr('OFFLINE', 'Нет связи с интернетом'); }
+    if (r.status === 404) throw new UErr('NOT_FOUND', 'Релиз не найден или репозиторий приватный');
+    if (r.status === 403 || r.status === 429) throw new UErr('LIMIT', 'GitHub временно ограничил запросы, попробуйте позже');
+    if (!r.ok) throw new UErr('HTTP', 'Ошибка GitHub: HTTP ' + r.status);
+    return r.json();
+  }
+
+  // версии: отдельные релизы с тегами v1.0.N (тег `latest` не считается), новые первыми
+  async function fetchVersions(force) {
+    if (!force && vcache.list && Date.now() - vcache.at < 30000) return vcache.list;
+    const arr = await api(`https://api.github.com/repos/${config.repo}/releases?per_page=30`);
+    const list = [];
+    for (const rel of Array.isArray(arr) ? arr : []) {
+      if (rel.draft || rel.prerelease) continue;
+      const m = VER_TAG.exec(String(rel.tag_name || ''));
+      if (!m) continue;
+      const asset = (rel.assets || []).find(a => a.name === config.asset && a.state === 'uploaded');
+      if (!asset) continue;
+      const parts = [Number(m[1]), Number(m[2]), Number(m[3])];
+      list.push({ version: parts.join('.'), parts, date: rel.published_at || rel.created_at || '', asset });
+    }
+    list.sort((a, b) => cmpVersion(b.parts, a.parts));
+    vcache = { at: Date.now(), list };
+    return list;
+  }
+
+  // старая схема: один релиз `latest` (пока нет релизов по версиям)
+  async function fetchLegacy() {
+    const rel = await api(`https://api.github.com/repos/${config.repo}/releases/tags/${config.tag}`);
+    const parts = parseVersion(rel.name) || parseVersion(rel.body);
+    const asset = (rel.assets || []).find(a => a.name === config.asset && a.state === 'uploaded');
+    if (!parts || !asset) throw new UErr('BAD_RELEASE', 'В релизе нет версии или файла exe');
+    return { version: parts.join('.'), parts, date: rel.published_at || '', asset };
+  }
 
   async function check() {
     if (busy) return state;
@@ -48,36 +98,55 @@ function createUpdater(deps) {
     try {
       if (!supported()) return set({ state: 'unsupported', message: 'Автообновление работает только в собранном exe' });
       set({ state: 'checking', message: '' });
-      let r;
+      let newest;
       try {
-        r = await fetchFn(`https://api.github.com/repos/${config.repo}/releases/tags/${config.tag}`, {
-          headers: { Accept: 'application/vnd.github+json', 'User-Agent': 'CalendarWidget-updater' },
-          signal: AbortSignal.timeout(15000)
-        });
-      } catch { return set({ state: 'error', code: 'OFFLINE', message: 'Нет связи с интернетом' }); }
-      if (r.status === 404) return set({ state: 'error', code: 'NOT_FOUND', message: 'Релиз не найден или репозиторий приватный' });
-      if (r.status === 403 || r.status === 429) return set({ state: 'error', code: 'LIMIT', message: 'GitHub временно ограничил запросы, попробуйте позже' });
-      if (!r.ok) return set({ state: 'error', code: 'HTTP', message: 'Ошибка GitHub: HTTP ' + r.status });
-      const rel = await r.json();
-      const latest = parseVersion(rel.name) || parseVersion(rel.body);
-      const asset = (rel.assets || []).find(a => a.name === config.asset && a.state === 'uploaded');
-      if (!latest || !asset) return set({ state: 'error', code: 'BAD_RELEASE', message: 'В релизе нет версии или файла exe' });
+        const list = await fetchVersions(true);
+        newest = list[0] || await fetchLegacy();
+      } catch (e) { return errState(e); }
       const cur = parseVersion(getVersion()) || [0, 0, 0];
-      if (cmpVersion(latest, cur) <= 0) { found = null; return set({ state: 'uptodate', latest: latest.join('.'), message: '' }); }
-      found = { version: latest.join('.'), asset };
+      const pin = getPin() || {};
+      // фиксация действует, только пока запущена именно эта версия
+      if (pin.version && pin.version === cur.join('.')) { found = null; return set({ state: 'pinned', latest: newest.version, message: '' }); }
+      if (cmpVersion(newest.parts, cur) <= 0) { found = null; return set({ state: 'uptodate', latest: newest.version, message: '' }); }
+      found = { version: newest.version, asset: newest.asset };
       return set({ state: 'available', latest: found.version, message: '' });
     } finally { busy = false; }
   }
 
-  async function install() {
+  // последние `limit` версий для списка в настройках (после «Оставить эту версию» более новые скрыты)
+  async function versions(limit = 3) {
+    let list;
+    try { list = await fetchVersions(false); } catch (e) { const x = asErr(e); return { ok: false, code: x.code, message: x.message }; }
+    const cur = (parseVersion(getVersion()) || [0, 0, 0]).join('.');
+    const pin = getPin() || {};
+    const kept = !!(pin.kept && pin.version && pin.version === cur);
+    const pinParts = kept ? parseVersion(pin.version) : null;
+    const shown = (pinParts ? list.filter(v => cmpVersion(v.parts, pinParts) <= 0) : list).slice(0, limit);
+    return {
+      ok: true, current: cur, newest: list[0]?.version || '', canInstall: supported(), kept,
+      items: shown.map(v => ({ version: v.version, date: v.date, current: v.version === cur, newest: v.version === list[0].version }))
+    };
+  }
+
+  async function install(version) {
     if (busy) return state;
-    if (!found) return set({ state: 'error', code: 'NONE', message: 'Сначала проверьте обновления' });
     const target = getExePath();
     if (!target) return set({ state: 'unsupported', message: 'Автообновление работает только в собранном exe' });
     busy = true;
-    const { asset, version } = found;
     const tmp = path.join(path.dirname(target), 'CalendarWidget.update.exe');
     try {
+      let pick = found, rollback = false;
+      if (version) { // конкретная версия из списка (в том числе более старая)
+        let list;
+        try { list = await fetchVersions(false); } catch (e) { return errState(e); }
+        const v = list.find(x => x.version === version);
+        if (!v) return set({ state: 'error', code: 'NONE', message: 'Такой версии нет в списке' });
+        pick = { version: v.version, asset: v.asset };
+        rollback = cmpVersion(v.parts, list[0].parts) < 0;
+      }
+      if (!pick) return set({ state: 'error', code: 'NONE', message: 'Сначала проверьте обновления' });
+      const { asset } = pick;
+      version = pick.version;
       set({ state: 'downloading', latest: version, progress: 0, message: '' });
       let r;
       try { r = await fetchFn(asset.browser_download_url, { headers: { 'User-Agent': 'CalendarWidget-updater' }, redirect: 'follow' }); }
@@ -112,6 +181,7 @@ function createUpdater(deps) {
       const want = /^sha256:([0-9a-f]{64})$/i.exec(asset.digest || '');
       if (want && hash.digest('hex') !== want[1].toLowerCase()) return bad('Контрольная сумма не совпала, обновление отменено');
 
+      try { onApplied({ version, rollback }); } catch {}
       set({ state: 'installing', message: 'Перезапуск…' });
       const bat = path.join(os.tmpdir(), 'calendar-widget-update-' + process.pid + '.bat');
       fs.writeFileSync(bat, buildSwapScript(tmp, target));
@@ -123,7 +193,7 @@ function createUpdater(deps) {
     } finally { busy = false; }
   }
 
-  return { check, install, getState: () => state, isFound: () => !!found };
+  return { check, install, versions, getState: () => state, isFound: () => !!found };
 }
 
 module.exports = { createUpdater, parseVersion, cmpVersion, buildSwapScript };

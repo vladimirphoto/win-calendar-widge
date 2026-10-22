@@ -31,6 +31,8 @@ const DEFAULTS = {
   onlyMine: false, // true = показывать только события, подходящие под ключевые слова
   opacity: 0.92,
   autoUpdate: true, // сам скачивать и ставить новые версии
+  pinVersion: '',   // версия, на которой остаёмся (после отката или «Оставить эту версию»); новые не ставятся автоматически
+  pinKept: false,   // true = пользователь подтвердил: новые версии в списке скрыты
   lastUpdateTry: 0, // когда последний раз пробовали автоустановку (защита от зацикливания)
   notify: true,    // уведомление Windows перед сменой
   notifyEve: '20:00', // для смен «на весь день»: во сколько напомнить накануне
@@ -110,6 +112,10 @@ function loadSettings() {
   settings = { ...DEFAULTS, ...rest };
   if (!settings.rates || typeof settings.rates !== 'object' || Array.isArray(settings.rates)) settings.rates = {};
   if (!['month', 'first', 'second'].includes(settings.payPeriod)) settings.payPeriod = 'month';
+  if (typeof settings.pinVersion !== 'string' || !/^\d+\.\d+\.\d+$/.test(settings.pinVersion)) settings.pinVersion = '';
+  settings.pinKept = !!settings.pinKept && !!settings.pinVersion;
+  // фиксация действует только пока запущена эта версия: если exe заменили вручную, снимаем её
+  if (settings.pinVersion && app.isPackaged && settings.pinVersion !== app.getVersion()) { settings.pinVersion = ''; settings.pinKept = false; }
   if (!settings.advance || typeof settings.advance !== 'object' || Array.isArray(settings.advance)) settings.advance = {};
   delete settings.scale; // убрано: размер виджета не настраивается
   delete settings.studioNames; // убрано: имя задаётся одним полем «Что считать сменой»
@@ -415,6 +421,11 @@ const updater = createUpdater({
   // самообновление возможно только у собранного portable-exe
   getExePath: () => (app.isPackaged && /\.exe$/i.test(process.env.PORTABLE_EXECUTABLE_FILE || '') ? process.env.PORTABLE_EXECUTABLE_FILE : ''),
   send: st => send('update:state', st),
+  getPin: () => ({ version: settings.pinVersion, kept: settings.pinKept }),
+  // старую версию ставим «на пробу»: автообновление не вернёт новую, пока вы не решите; последнюю версию ставим без фиксации
+  onApplied: ({ version, rollback }) => {
+    settings.pinVersion = rollback ? version : ''; settings.pinKept = false; settings.lastUpdateTry = Date.now(); saveSettings();
+  },
   onQuit: () => { quitting = true; setTimeout(() => app.exit(0), 300); }
 });
 
@@ -756,7 +767,24 @@ function registerIpc() {
   });
   ipcMain.handle('update:state', () => updater.getState());
   ipcMain.handle('update:check', () => checkForUpdates({ auto: false }));
-  ipcMain.handle('update:install', async () => { settings.lastUpdateTry = Date.now(); saveSettings(); return updater.install(); });
+  ipcMain.handle('update:install', async (_e, version) => {
+    settings.lastUpdateTry = Date.now(); saveSettings();
+    return updater.install(typeof version === 'string' && /^\d+\.\d+\.\d+$/.test(version) ? version : undefined);
+  });
+  ipcMain.handle('update:versions', () => updater.versions(3));
+  // «Оставить эту версию» / «Снять фиксацию»
+  ipcMain.handle('update:pin', async (_e, action) => {
+    if (action === 'keep') {
+      settings.pinVersion = app.getVersion(); settings.pinKept = true;
+      // убираем недокачанное обновление рядом с exe
+      const exe = process.env.PORTABLE_EXECUTABLE_FILE;
+      if (exe) try { fs.rmSync(path.join(path.dirname(exe), 'CalendarWidget.update.exe'), { force: true }); } catch {}
+    } else if (action === 'clear') { settings.pinVersion = ''; settings.pinKept = false; }
+    else return { ok: false };
+    saveSettings();
+    send('settings:changed', publicSettings());
+    return { ok: true };
+  });
   ipcMain.handle('app:wipe', async (_e, opts) => {
     try { await wipeEverything(!!opts?.deleteExe); return { ok: true }; }
     catch (e) { return { ok: false, message: e.message || String(e) }; }
