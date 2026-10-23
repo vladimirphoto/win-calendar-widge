@@ -289,6 +289,7 @@ function updateEarn() {
     if (earnEl.dataset.sig !== sig) { earnEl.replaceChildren(...kids); earnEl.dataset.sig = sig; }
   }
   if (earnEl.hidden === showEarn) earnEl.hidden = !showEarn;
+  fitTitle();
 }
 
 // поля аванса в настройках показывают открытый сейчас месяц
@@ -390,11 +391,22 @@ function renderInsights() {
   if (box.hidden === (kids.length > 0)) box.hidden = !kids.length;
 }
 
+// заголовок дня: длинный день недели, а если заработок рядом не помещается в строку, сокращённый («Вс, 25 октября»)
+function fitTitle() {
+  const h = $('agTitle'), e = $('earn');
+  const text = short => sel.toLocaleDateString('ru', { weekday: short ? 'short' : 'long', day: 'numeric', month: 'long' });
+  const cap = t => t.charAt(0).toUpperCase() + t.slice(1);
+  const over = () => h.scrollWidth > h.clientWidth + 1;
+  h.textContent = cap(text(false));
+  if (over()) h.textContent = cap(text(true));
+  if (over()) h.textContent = sel.toLocaleDateString('ru', { day: 'numeric', month: 'numeric' });
+}
+
 function renderAgenda() {
   const sec = document.querySelector('.agenda');
   sec.hidden = isClean();
   if (isClean()) { agEvs = []; return; }
-  $('agTitle').textContent = sel.toLocaleDateString('ru', { weekday: 'long', day: 'numeric', month: 'long' });
+  fitTitle();
   const evs = visibleEvents(ymd(sel));
   const list = $('agList');
   if (list.contains(document.activeElement)) return; // не перерисовываем, пока вводят сумму
