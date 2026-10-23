@@ -229,10 +229,10 @@ const payKey = e => ymd(e.start) + '|' + rateKey(e.color);
 const defaultRate = e => (settings?.rates || {})[rateKey(e.color)] || 0;
 const payFor = e => { const v = dayPay[payKey(e)]; return v === undefined ? defaultRate(e) : v; };
 
-function monthShifts(of = view) {
+function monthShifts() {
   const seen = new Set(); const out = [];
   for (const [k, list] of Object.entries(events)) {
-    if (!sameMonth(localDate(k), of)) continue;
+    if (!sameMonth(localDate(k), view)) continue;
     for (const e of list) {
       if (!e.shift) continue;
       const id = e.id + '|' + e.start.getTime();
@@ -257,9 +257,6 @@ function payCountdown() {
   return n === 0 ? 'ЗП сегодня' : `ЗП через ${n} ${plural(n, 'день', 'дня', 'дней')}`;
 }
 
-const MONTH_DAT = ['январю', 'февралю', 'марту', 'апрелю', 'маю', 'июню', 'июлю', 'августу', 'сентябрю', 'октябрю', 'ноябрю', 'декабрю'];
-const MONTH_PREP = ['январе', 'феврале', 'марте', 'апреле', 'мае', 'июне', 'июле', 'августе', 'сентябре', 'октябре', 'ноябре', 'декабре'];
-
 const PAY_POS = { month: 0, first: 1, second: 2 };
 const payPeriod = () => (settings?.payPeriod in PAY_POS ? settings.payPeriod : 'month');
 
@@ -279,15 +276,6 @@ function updateEarn() {
   if (showEarn) {
     const main = document.createElement('span'); main.textContent = label + ': ' + money(earn);
     const kids = [main];
-    // сравнение с прошлым месяцем (с той же половиной, если выбрана половина)
-    const pv = new Date(view.getFullYear(), view.getMonth() - 1, 1);
-    const prevEarn = monthShifts(pv).filter(e => period === 'month' || (period === 'first') === (e.start.getDate() <= 15)).reduce((a, e) => a + payFor(e), 0);
-    if (earn > 0 && prevEarn > 0) {
-      const pct = Math.round((earn / prevEarn - 1) * 100);
-      const cmp = document.createElement('i'); cmp.className = 'cmp' + (pct > 0 ? ' up' : pct < 0 ? ' down' : '');
-      cmp.textContent = pct === 0 ? `как в ${MONTH_PREP[pv.getMonth()]}` : `${pct > 0 ? '+' : '−'}${Math.abs(pct)}% к ${MONTH_DAT[pv.getMonth()]}`;
-      main.append(cmp);
-    }
     if (adv > 0) {
       const line = document.createElement('span'); line.className = 'adv';
       line.textContent = `аванс −${money(adv)} · к выплате ${money(Math.max(0, earn - adv))}`;
@@ -537,10 +525,6 @@ function applySettings(s) {
   if (document.activeElement !== $('fGoal')) $('fGoal').value = s.goal > 0 ? String(s.goal) : '';
   if (document.activeElement !== $('fFreeMin')) $('fFreeMin').value = s.freeMin || 3;
   $('tNotify').checked = !!s.notify;
-  $('tRemind').checked = !!s.remindPay; $('rRemind').hidden = !s.remindPay;
-  if (document.activeElement !== $('fRemindTime')) $('fRemindTime').value = s.remindPayTime || '20:00';
-  $('tHotkey').checked = !!s.hotkeyOn;
-  { const n = $('hotkeyNote'); n.hidden = !s.hotkeyOn; n.textContent = s.hotkeyActive ? `Работает: ${s.hotkeyActive}` : 'Не удалось занять сочетание: его использует другая программа или Windows'; }
   $('tAutoUpd').checked = !!s.autoUpdate;
   renderUpdate();
   if (document.activeElement !== $('fNotifyH')) $('fNotifyH').value = s.notifyHours;
@@ -871,9 +855,6 @@ $('fFreeMin').addEventListener('input', () => {
   clearTimeout(panelsTimer);
   panelsTimer = setTimeout(() => { const n = Number($('fFreeMin').value); if (n >= 2) api.setSettings({ freeMin: n }); }, 500);
 });
-$('tRemind').onchange = () => api.setSettings({ remindPay: $('tRemind').checked });
-$('tHotkey').onchange = () => api.setSettings({ hotkeyOn: $('tHotkey').checked });
-$('fRemindTime').addEventListener('change', () => { if ($('fRemindTime').value) api.setSettings({ remindPayTime: $('fRemindTime').value }); });
 $('tNotify').onchange = () => api.setSettings({ notify: $('tNotify').checked });
 $('fNotifyEve').addEventListener('change', () => { if ($('fNotifyEve').value) api.setSettings({ notifyEve: $('fNotifyEve').value }); });
 let notifyTimer;
@@ -935,36 +916,6 @@ $('agTitle').addEventListener('click', () => {
   titleClicks = titleClicks.filter(t => now - t < 2000).concat(now);
   if (titleClicks.length >= 5) { titleClicks = []; confetti(); }
 });
-/* ---------- напоминание внести заработок: в выходной, за смены без суммы ---------- */
-const studioName = e => String(e.calendar || '').replace(/^.*?\sна\s+/i, '').replace(/^В!Ф\s*(Алматы)?\s*/i, '').trim();
-function remindPay() {
-  if (!settings?.remindPay || !loggedIn || demo || isClean() || dataPending()) return;
-  const now = new Date(), todayK = ymd(now);
-  const [h, m] = (settings.remindPayTime || '20:00').split(':').map(Number);
-  if (now.getHours() * 60 + now.getMinutes() < h * 60 + m) return;
-  if ((events[todayK] || []).some(e => e.shift)) return; // напоминаем только в выходной
-  try { if (localStorage.getItem('remind-day') === todayK) return; } catch {}
-  // смены за последние 7 дней, у которых нет введённой суммы
-  const miss = []; const seen = new Set();
-  for (let i = 1; i <= 7; i++) {
-    const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
-    for (const e of events[ymd(d)] || []) {
-      const id = e.id + '|' + e.start.getTime();
-      if (!e.shift || seen.has(id) || dayPay[payKey(e)] !== undefined) continue;
-      seen.add(id); miss.push({ e, d });
-    }
-  }
-  if (!miss.length) return;
-  try { localStorage.setItem('remind-day', todayK); } catch {}
-  if (miss.length === 1) {
-    const { e, d } = miss[0], st = studioName(e);
-    const day = i => i === 1 ? 'Вчера' : d.toLocaleDateString('ru', { day: 'numeric', month: 'long' });
-    api.notifyCustom(`${day(Math.round((new Date(now.getFullYear(), now.getMonth(), now.getDate()) - d) / 864e5))} была смена${st ? ' на ' + st : ''}`, 'Сколько заработали? Впишите сумму в календаре.');
-  } else {
-    api.notifyCustom(`Не внесена сумма за ${miss.length} ${plural(miss.length, 'смену', 'смены', 'смен')}`, 'Откройте календарь и впишите заработок за эти дни.');
-  }
-}
-
 function paydayConfetti() {
   if (settings?.surprise === false) return;
   if (document.visibilityState !== 'visible') return; // окно скрыто в трей: покажем, когда его откроют
@@ -998,7 +949,6 @@ document.addEventListener('visibilitychange', paydayConfetti);
     if (k !== lastDay) { lastDay = k; render(); paydayConfetti(); if (loggedIn) sync(); }
     updateNext(false);
     paydayConfetti();
-    remindPay();
     const away = !isToday(sel) || !sameMonth(view, new Date());
     if (away && $('panel').hidden && Date.now() - lastActivity >= IDLE_RETURN_MS) goToday();
   }, 30 * 1000);
