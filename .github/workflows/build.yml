@@ -31,21 +31,3 @@ jobs:
           tag_name: latest
           name: CalendarWidget 1.0.${{ github.run_number }}
           files: dist/CalendarWidget.exe
-      # отдельный релиз на каждую версию (v1.0.N): из них виджет собирает список «последние 3» для отката
-      - uses: softprops/action-gh-release@v2
-        continue-on-error: true
-        with:
-          tag_name: v1.0.${{ github.run_number }}
-          name: CalendarWidget 1.0.${{ github.run_number }}
-          make_latest: false
-          files: dist/CalendarWidget.exe
-      # храним 10 последних версий, старые релизы и их теги удаляем (тег latest не трогаем)
-      - name: Prune old version releases
-        continue-on-error: true
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          gh release list --repo "${{ github.repository }}" --limit 200 --json tagName --jq '.[].tagName' \
-            | grep -E '^v1\.0\.[0-9]+$' | sort -t. -k3 -n -r | tail -n +11 \
-            | while read -r t; do gh release delete "$t" --repo "${{ github.repository }}" --cleanup-tag --yes; done

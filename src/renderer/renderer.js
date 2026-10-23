@@ -615,7 +615,7 @@ function updateNext(pushToMain) {
   }
 }
 
-function openPanel() { renderRates(); loadVersions(); $('panel').hidden = false; document.body.classList.add('panel-open'); api.fit(10000); }
+function openPanel() { renderRates(); $('panel').hidden = false; document.body.classList.add('panel-open'); api.fit(10000); }
 function closePanel() { $('panel').hidden = true; document.body.classList.remove('panel-open'); hideCfgErr(); fitWindow(); }
 
 function renderSeg() {
@@ -728,72 +728,14 @@ function renderUpdate() {
   else if (st === 'downloading') { tail = `скачиваю ${upd.latest}: ${upd.progress || 0}%`; btn.disabled = true; btn.textContent = 'Скачиваю…'; }
   else if (st === 'installing') { tail = 'перезапуск…'; btn.disabled = true; btn.textContent = 'Перезапуск…'; }
   else if (st === 'uptodate') tail = 'последняя';
-  else if (st === 'pinned') tail = settings?.pinKept ? 'зафиксирована' : 'пробная, обновления приостановлены';
   else if (st === 'error') { tail = upd.message || 'не удалось проверить'; btn.textContent = 'Повторить'; }
   else if (st === 'unsupported') { tail = upd.message || ''; btn.disabled = true; }
   txt.textContent = tail ? `${t} · ${tail}` : t;
   txt.classList.toggle('bad', st === 'error');
-  renderVersions();
 }
 $('btnUpd').onclick = () => (upd.state === 'available' ? api.updateInstall() : api.updateCheck());
 $('tAutoUpd').onchange = () => api.setSettings({ autoUpdate: $('tAutoUpd').checked });
-api.onUpdate(s => {
-  const was = upd.state; upd = s; renderUpdate();
-  if (s.state !== was && ['uptodate', 'available', 'pinned'].includes(s.state) && !$('panel').hidden) loadVersions();
-});
-
-/* ---------- версии: последние 3, установка выбранной, «оставить эту» ---------- */
-let vers = null;       // ответ update:versions
-let verArmed = '';     // версия, для которой нажали «Установить» и ждём подтверждения
-let verArmTimer = 0;
-async function loadVersions() {
-  try { vers = await api.updateVersions(); } catch { vers = { ok: false, message: 'Не удалось загрузить список' }; }
-  renderVersions();
-}
-const verDate = iso => { const d = new Date(iso); return isNaN(d) ? '' : d.toLocaleDateString('ru', { day: 'numeric', month: 'short' }).replace('.', ''); };
-function renderVersions() {
-  const box = $('vers'), list = $('verList'), pin = $('pinBox');
-  if (!vers || (vers.ok && !vers.items.length)) { box.hidden = true; return; } // пока нет релизов по версиям
-  box.hidden = false;
-  list.textContent = '';
-  if (!vers.ok) { list.append(mk('p', 'hint', vers.message || 'Не удалось загрузить список')); pin.hidden = true; return; }
-  const busy = ['checking', 'downloading', 'installing'].includes(upd.state);
-  for (const it of vers.items) {
-    const row = mk('div', 'ver');
-    row.append(mk('span', 'v', it.version));
-    if (it.newest && vers.items.length > 1) row.append(mk('span', 'tag', 'новая'));
-    row.append(mk('span', 'd', verDate(it.date)));
-    if (it.current) row.append(mk('span', 'cur', 'Установлена'));
-    else {
-      const b = mk('button', 'chip', verArmed === it.version ? 'Точно? Перезапуск' : 'Установить');
-      b.type = 'button'; b.disabled = busy || !vers.canInstall;
-      b.onclick = () => {
-        if (verArmed !== it.version) {
-          verArmed = it.version; clearTimeout(verArmTimer);
-          verArmTimer = setTimeout(() => { verArmed = ''; renderVersions(); }, 4000);
-          renderVersions(); return;
-        }
-        verArmed = ''; clearTimeout(verArmTimer);
-        api.updateInstall(it.version);
-      };
-      row.append(b);
-    }
-    list.append(row);
-  }
-  // фиксация: «Оставить эту версию» (если стоит не самая новая) или «Снять фиксацию»
-  const kept = !!vers.kept;
-  const older = vers.current && vers.newest && vers.current !== vers.newest;
-  pin.hidden = !(kept || older);
-  if (!pin.hidden) {
-    $('pinText').textContent = kept ? `Версия ${vers.current} зафиксирована. Новые не ставятся.` : 'Нравится эта версия? Оставьте её, новые скроются.';
-    $('btnPin').textContent = kept ? 'Снять' : 'Оставить эту версию';
-    $('btnPin').onclick = async () => {
-      await api.updatePin(kept ? 'clear' : 'keep');
-      await loadVersions();
-      if (kept) api.updateCheck();
-    };
-  }
-}
+api.onUpdate(s => { upd = s; renderUpdate(); });
 
 $('btnWipe').onclick = () => { $('wipeExeRow').hidden = !settings?.canDeleteExe; $('wipeBox').hidden = false; $('btnWipe').hidden = true; $('wipeBox').scrollIntoView({ block: 'nearest' }); };
 $('btnWipeNo').onclick = () => { $('wipeBox').hidden = true; $('btnWipe').hidden = false; };
