@@ -77,9 +77,14 @@ body {
 }
 
 /* шапка — область перетаскивания окна */
-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; -webkit-app-region: drag; min-height: 46px; }
-body.locked header { -webkit-app-region: no-drag; }
-.tools, .tools > * { -webkit-app-region: no-drag; }
+header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; min-height: 46px; }
+/* окно тянется только за узкую полоску сверху: вся шапка раньше была зоной перетаскивания и мешала нажимать кнопки (в том числе под панелью настроек) */
+.grip { position: absolute; top: 0; left: 0; right: 0; height: 12px; z-index: 40; display: flex; justify-content: center; align-items: flex-start; -webkit-app-region: drag; }
+.grip i { margin-top: 4px; width: 34px; height: 4px; border-radius: 2px; background: var(--muted); opacity: .3; transition: opacity .15s; }
+.grip:hover i { opacity: .7; }
+body.locked .grip { -webkit-app-region: no-drag; }
+body.locked .grip i { display: none; }
+#advBox[hidden] { display: none; }
 .month { font-family: var(--font-display); font-size: 19px; font-weight: 600; text-transform: capitalize; line-height: 1.2; }
 .month small { font-weight: 400; color: var(--muted); font-size: 16px; margin-left: 6px; }
 .sub { font-size: 12px; color: var(--shift); margin-top: 1px; min-height: 15px; }
@@ -187,10 +192,12 @@ footer { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; al
 
 /* настройки */
 .panel {
-  position: absolute; inset: 0; padding: 14px 16px; overflow-y: auto;
+  position: absolute; inset: 0; padding: 0 16px 14px; overflow-y: auto;
   background: var(--panel-bg); z-index: 5;
 }
 .panel[hidden] { display: none; }
+/* верхние 12 px настроек заняты полоской перетаскивания: при прокрутке содержимое уходит под эту заглушку того же цвета, а не под полоску */
+.panel::before { content: ""; display: block; position: sticky; top: 0; z-index: 3; height: 12px; margin: 0 -16px 2px; background: var(--panel-bg); }
 body.panel-open .card { height: 100%; }
 body.dark-fallback .panel { background: #202020; }
 .panel-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; min-height: 36px; }

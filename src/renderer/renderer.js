@@ -229,7 +229,7 @@ function updateEarn() {
   const period = payPeriod();
   const list = monthShifts().filter(e => period === 'month' || (period === 'first') === (e.start.getDate() <= 15));
   const earn = list.reduce((sum, e) => sum + payFor(e), 0);
-  const adv = period === 'month' ? advFor('first') + advFor('second') : advFor(period);
+  const adv = !settings?.advanceOn ? 0 : period === 'month' ? advFor('first') + advFor('second') : advFor(period);
   const earnEl = $('earn');
   const showEarn = (list.length > 0 && earn > 0) || adv > 0;
   const lastDay = new Date(view.getFullYear(), view.getMonth() + 1, 0).getDate();
@@ -471,6 +471,7 @@ function applySettings(s) {
   $('tStats').checked = !!s.statsOn;
   $('tFree').checked = !!s.freeOn; $('rFree').hidden = !s.freeOn;
   $('tFun').checked = s.surprise !== false;
+  $('tAdv').checked = !!s.advanceOn; $('advBox').hidden = !s.advanceOn;
   if (document.activeElement !== $('fGoal')) $('fGoal').value = s.goal > 0 ? String(s.goal) : '';
   if (document.activeElement !== $('fFreeMin')) $('fFreeMin').value = s.freeMin || 3;
   $('tNotify').checked = !!s.notify;
@@ -768,6 +769,20 @@ $('btnClearPay').onclick = async () => {
 };
 $('tGoal').onchange = () => api.setSettings({ goalOn: $('tGoal').checked });
 $('tStats').onchange = () => api.setSettings({ statsOn: $('tStats').checked });
+$('tAdv').onchange = () => api.setSettings({ advanceOn: $('tAdv').checked });
+let advClearArmed = 0;
+$('btnClearAdv').onclick = async () => {
+  const b = $('btnClearAdv');
+  if (!advClearArmed) {
+    b.textContent = 'Точно очистить?';
+    advClearArmed = setTimeout(() => { advClearArmed = 0; b.textContent = 'Очистить аванс'; }, 4000);
+    return;
+  }
+  clearTimeout(advClearArmed); advClearArmed = 0; b.textContent = 'Очистить аванс';
+  clearTimeout(advTimer); advTimer = 0; advance = {};
+  await api.setSettings({ advance: {} });
+  renderAdv(); updateEarn();
+};
 $('tFun').onchange = () => api.setSettings({ surprise: $('tFun').checked });
 $('tFree').onchange = () => api.setSettings({ freeOn: $('tFree').checked });
 let panelsTimer;

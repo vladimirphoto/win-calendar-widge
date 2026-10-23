@@ -9,6 +9,7 @@
 <body>
 <main class="card" id="card">
   <div class="glassbg" id="glassbg" aria-hidden="true" hidden><div class="gw" id="gw"></div></div>
+  <div class="grip" id="grip" title="Перетащить" aria-hidden="true"><i></i></div>
   <header id="head">
     <div class="ttl">
       <div class="month" id="title"></div>
@@ -109,14 +110,18 @@
     <div class="row"><button class="chip" id="btnClearPay" type="button">Очистить заработок</button></div>
 
     <h3 class="sect">Аванс</h3>
-    <p class="hint">За месяц в календаре (<b id="advMonth"></b>). Вычитается из заработка.</p>
-    <div class="rate">
-      <label class="nm" for="fAdvFirst">За 1–15</label>
-      <span class="fld"><input id="fAdvFirst" type="number" min="0" max="1000000000" step="1000" inputmode="numeric" placeholder="0" data-half="first"><i class="suf">₸</i></span>
-    </div>
-    <div class="rate">
-      <label class="nm" for="fAdvSecond">За 16–конец</label>
-      <span class="fld"><input id="fAdvSecond" type="number" min="0" max="1000000000" step="1000" inputmode="numeric" placeholder="0" data-half="second"><i class="suf">₸</i></span>
+    <div class="toggle"><span>Учитывать аванс</span><label class="sw"><input type="checkbox" id="tAdv"><b></b></label></div>
+    <div id="advBox" hidden>
+      <p class="hint">За месяц в календаре (<b id="advMonth"></b>). Вычитается из заработка, в новом месяце очищается.</p>
+      <div class="rate">
+        <label class="nm" for="fAdvFirst">За 1–15</label>
+        <span class="fld"><input id="fAdvFirst" type="number" min="0" max="1000000000" step="1000" inputmode="numeric" placeholder="0" data-half="first"><i class="suf">₸</i></span>
+      </div>
+      <div class="rate">
+        <label class="nm" for="fAdvSecond">За 16–конец</label>
+        <span class="fld"><input id="fAdvSecond" type="number" min="0" max="1000000000" step="1000" inputmode="numeric" placeholder="0" data-half="second"><i class="suf">₸</i></span>
+      </div>
+      <div class="row"><button class="chip" id="btnClearAdv" type="button">Очистить аванс</button></div>
     </div>
 
     <h3 class="sect">Панели в календаре</h3>

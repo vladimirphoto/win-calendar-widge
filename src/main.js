@@ -10,6 +10,7 @@ const os = require('os');
 const { spawn, execFile } = require('child_process');
 const EMBEDDED = require('./google-client');
 const { createUpdater } = require('./updater');
+const { pruneAdvance } = require('./advance');
 const UPDATE_CFG = require('./update-config');
 
 // Идентификатор приложения для уведомлений Windows; название и значок для заголовка уведомления регистрируются в реестре (registerToastIdentity)
@@ -43,6 +44,7 @@ const DEFAULTS = {
   statsOn: false,  // панель «статистика по студиям»
   freeOn: false,   // подсветка серий свободных дней
   freeMin: 3,      // от скольких дней подряд считать серию
+  advanceOn: false, // учитывать аванс (вычитать из заработка)
   advance: {},     // аванс по половинам месяца: { '2026-10|first': 50000, '2026-10|second': 30000 }, вычитается из заработка
   payPeriod: 'month', // за какой период показывать заработок: 'month' весь месяц | 'first' 1–15 | 'second' 16–конец
   theme: 'system', // 'system' | 'light' | 'dark' | 'glass'
@@ -104,6 +106,12 @@ function writeSecret(value) {
     return true;
   } catch (e) { console.error('secret save failed', e); return false; }
 }
+// с новым месяцем аванс прошлых месяцев стирается
+function pruneAdvanceNow() {
+  const r = pruneAdvance(settings.advance);
+  if (r.changed) { settings.advance = r.map; return true; }
+  return false;
+}
 function loadSettings() {
   let raw = {};
   try { raw = JSON.parse(fs.readFileSync(settingsFile(), 'utf8')) || {}; } catch {}
@@ -113,6 +121,9 @@ function loadSettings() {
   if (!['month', 'first', 'second'].includes(settings.payPeriod)) settings.payPeriod = 'month';
   delete settings.pinVersion; delete settings.pinKept; // убрано: выбор версии и фиксация
   if (!settings.advance || typeof settings.advance !== 'object' || Array.isArray(settings.advance)) settings.advance = {};
+  // раньше аванс работал всегда: у кого он уже внесён, оставляем включённым
+  if (typeof raw.advanceOn !== 'boolean') settings.advanceOn = Object.keys(settings.advance).length > 0;
+  pruneAdvanceNow();
   delete settings.scale; // убрано: размер виджета не настраивается
   delete settings.studioNames; // убрано: имя задаётся одним полем «Что считать сменой»
   if (!settings.dayPay || typeof settings.dayPay !== 'object' || Array.isArray(settings.dayPay)) settings.dayPay = {};
@@ -616,7 +627,7 @@ function applyWindowBehavior() {
 function updateSettings(patch) {
   const next = { ...settings };
   if (typeof patch.keywords === 'string') next.keywords = patch.keywords.slice(0, 200);
-  for (const k of ['autostart', 'alwaysOnTop', 'locked', 'onlyMine', 'notify', 'autoUpdate', 'goalOn', 'statsOn', 'freeOn', 'surprise']) {
+  for (const k of ['autostart', 'alwaysOnTop', 'locked', 'onlyMine', 'notify', 'autoUpdate', 'goalOn', 'statsOn', 'freeOn', 'surprise', 'advanceOn']) {
     if (typeof patch[k] === 'boolean') next[k] = patch[k];
   }
   if (typeof patch.opacity === 'number' && isFinite(patch.opacity)) {
@@ -801,7 +812,9 @@ if (!app.requestSingleInstanceLock()) {
     // проверка обновлений: через 20 секунд после старта и затем каждые 6 часов
     setTimeout(() => checkForUpdates({ auto: true }), 20 * 1000);
     setInterval(() => checkForUpdates({ auto: true }), 6 * 3600 * 1000);
-    powerMonitor.on('resume', () => setTimeout(() => send('app:refresh'), 4000));
+    const advanceTick = () => { if (pruneAdvanceNow()) { saveSettings(); send('settings:changed', publicSettings()); } };
+    setInterval(advanceTick, 15 * 60 * 1000);
+    powerMonitor.on('resume', () => { setTimeout(() => send('app:refresh'), 4000); advanceTick(); });
     powerMonitor.on('unlock-screen', () => send('app:refresh'));
   });
 
