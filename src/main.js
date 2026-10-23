@@ -795,10 +795,12 @@ function registerIpc() {
   ipcMain.on('window:hide', () => win?.hide());
   ipcMain.on('window:fit', (_e, h) => {
     if (!win || win.isDestroyed() || typeof h !== 'number' || !isFinite(h)) return;
-    const height = Math.round(Math.min(WIN_H, Math.max(WIN_MIN_H, h)));
     const b = win.getBounds();
-    if (b.height === height) return;
     const wa = screen.getDisplayMatching(b).workArea;
+    // настройки просят «сколько угодно» (10000): им хватает обычной высоты; календарю с панелями разрешаем расти до высоты экрана
+    const cap = h >= 9999 ? WIN_H : Math.max(WIN_H, Math.min(wa.height - 16, 940));
+    const height = Math.round(Math.min(cap, Math.max(WIN_MIN_H, h)));
+    if (b.height === height) return;
     const y = Math.max(wa.y, Math.min(b.y, wa.y + wa.height - height));
     win.setBounds({ x: b.x, y, width: WIN_W, height });
   });

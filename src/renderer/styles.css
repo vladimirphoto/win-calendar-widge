@@ -120,7 +120,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 
 /* повестка дня */
 .agenda[hidden] { display: none; }
-.agenda { flex: 0 1 auto; min-height: 0; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); display: flex; flex-direction: column; }
+.agenda { flex: 0 1 auto; min-height: 0; overflow: hidden; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); display: flex; flex-direction: column; }
 .agh { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
 .agenda h3 { font-size: 13px; font-weight: 600; text-transform: capitalize; }
 .list { overflow-y: auto; flex: 0 1 auto; min-height: 0; padding-right: 2px; }
@@ -151,7 +151,7 @@ footer { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; al
 
 /* панели под сеткой: цель, студии, свободные дни */
 .ins[hidden] { display: none; }
-.ins { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 10px; font-size: 12px; }
+.ins { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 8px; flex: none; font-size: 12px; }
 .ins .gt { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 2px 8px; color: var(--muted); font-variant-numeric: tabular-nums; }
 .ins .gt b { color: var(--text); font-weight: 600; }
 .gbar { position: relative; height: 6px; margin-top: 5px; border-radius: 3px; background: var(--hover); overflow: hidden; }
@@ -159,7 +159,7 @@ footer { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; al
 .gbar .gp { background: color-mix(in srgb, var(--shift) 32%, transparent); }
 .gbar .gd { background: var(--shift); }
 .ins .sh { font-weight: 600; margin-bottom: 3px; }
-.st { display: grid; grid-template-columns: 8px minmax(0, 1fr) auto auto; gap: 8px; align-items: center; padding: 2px 0; font-variant-numeric: tabular-nums; }
+.st { display: grid; grid-template-columns: 8px minmax(0, 1fr) auto auto; gap: 8px; align-items: center; padding: 1px 0; line-height: 1.3; font-variant-numeric: tabular-nums; }
 .st i { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
 .st .n { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .st .c { color: var(--muted); }
@@ -168,16 +168,6 @@ footer { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; al
 .ins .fr2 b { color: var(--text); font-weight: 600; }
 .day.free:not(.shift) { outline: 1px dashed color-mix(in srgb, var(--muted) 60%, transparent); outline-offset: -3px; }
 .rate[hidden] { display: none; }
-
-/* настройки: сворачиваемые группы */
-.grp { border-top: 1px solid var(--line); margin-top: 10px; }
-.grp > summary { list-style: none; cursor: pointer; display: flex; align-items: center; justify-content: space-between; padding: 11px 2px; font-size: 13px; font-weight: 600; user-select: none; border-radius: 6px; }
-.grp > summary::-webkit-details-marker { display: none; }
-.grp > summary:hover { background: var(--hover); }
-.grp > summary::after { content: ""; width: 6px; height: 6px; margin-right: 4px; border-right: 1.6px solid var(--muted); border-bottom: 1.6px solid var(--muted); transform: rotate(45deg) translate(-1px, -1px); transition: transform .2s; }
-.grp[open] > summary::after { transform: rotate(-135deg) translate(-1px, -1px); }
-.grp[open] { padding-bottom: 6px; }
-.grp > .hint:first-of-type { margin-top: 0; }
 
 /* список версий */
 .vers { margin-top: 14px; }

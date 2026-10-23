@@ -332,8 +332,8 @@ function renderInsights() {
       const runs = freeRuns().filter(r => r.some(d => sameMonth(d, view)));
       const p = mk('div', 'fr2');
       if (runs.length) {
-        p.append(mk('b', '', 'Свободно: '), runs.slice(0, 3).map(runLabel).join(' · ') + (runs.length > 3 ? ' …' : ''));
-      } else p.textContent = `Серий свободных дней от ${settings.freeMin || 3} подряд нет`;
+        p.append(mk('b', '', 'Серия выходных: '), runs.slice(0, 3).map(runLabel).join(' · ') + (runs.length > 3 ? ' …' : ''));
+      } else p.textContent = `Серий выходных от ${settings.freeMin || 3} дн. нет`;
       kids.push(p);
     }
   }
@@ -615,7 +615,7 @@ function updateNext(pushToMain) {
   }
 }
 
-function openPanel() { renderRates(); $('panel').hidden = false; document.body.classList.add('panel-open'); api.fit(10000); }
+function openPanel() { renderRates(); loadVersions(); $('panel').hidden = false; document.body.classList.add('panel-open'); api.fit(10000); }
 function closePanel() { $('panel').hidden = true; document.body.classList.remove('panel-open'); hideCfgErr(); fitWindow(); }
 
 function renderSeg() {
@@ -739,7 +739,7 @@ $('btnUpd').onclick = () => (upd.state === 'available' ? api.updateInstall() : a
 $('tAutoUpd').onchange = () => api.setSettings({ autoUpdate: $('tAutoUpd').checked });
 api.onUpdate(s => {
   const was = upd.state; upd = s; renderUpdate();
-  if (s.state !== was && ['uptodate', 'available', 'pinned'].includes(s.state) && $('gUpd').open) loadVersions();
+  if (s.state !== was && ['uptodate', 'available', 'pinned'].includes(s.state) && !$('panel').hidden) loadVersions();
 });
 
 /* ---------- версии: последние 3, установка выбранной, «оставить эту» ---------- */
@@ -794,7 +794,6 @@ function renderVersions() {
     };
   }
 }
-$('gUpd').addEventListener('toggle', () => { if ($('gUpd').open) loadVersions(); });
 
 $('btnWipe').onclick = () => { $('wipeExeRow').hidden = !settings?.canDeleteExe; $('wipeBox').hidden = false; $('btnWipe').hidden = true; $('wipeBox').scrollIntoView({ block: 'nearest' }); };
 $('btnWipeNo').onclick = () => { $('wipeBox').hidden = true; $('btnWipe').hidden = false; };
@@ -855,7 +854,7 @@ api.onAuthChanged(v => { loggedIn = v; if (!v) { demo = true; upcoming = []; eve
 
 /* ---------- старт ---------- */
 /* ---------- сюрприз: конфетти ---------- */
-// в день выплаты (1 и 15 число) при первом открытии за день, а также если быстро кликнуть 5 раз на название месяца
+// в день выплаты (1 и 15 число) при первом показе за день, а также если быстро кликнуть 5 раз на строку с датой под календарём
 let fxBusy = false;
 function confetti() {
   if (fxBusy || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
@@ -892,7 +891,7 @@ function confetti() {
   raf = requestAnimationFrame(tick);
 }
 let titleClicks = [];
-$('title').addEventListener('click', () => {
+$('agTitle').addEventListener('click', () => {
   if (settings?.surprise === false) return;
   const now = Date.now();
   titleClicks = titleClicks.filter(t => now - t < 2000).concat(now);
@@ -900,11 +899,14 @@ $('title').addEventListener('click', () => {
 });
 function paydayConfetti() {
   if (settings?.surprise === false) return;
+  if (document.visibilityState !== 'visible') return; // окно скрыто в трей: покажем, когда его откроют
   const d = new Date(); if (d.getDate() !== 1 && d.getDate() !== 15) return;
   const k = ymd(d);
   try { if (localStorage.getItem('payday-fx') === k) return; localStorage.setItem('payday-fx', k); } catch {}
   setTimeout(confetti, 700);
 }
+
+document.addEventListener('visibilitychange', paydayConfetti);
 
 (async function init() {
   applyAccent(await api.getAccent());
@@ -923,7 +925,7 @@ function paydayConfetti() {
   let lastDay = ymd(new Date());
   setInterval(() => {
     const k = ymd(new Date());
-    if (k !== lastDay) { lastDay = k; render(); if (loggedIn) sync(); }
+    if (k !== lastDay) { lastDay = k; render(); paydayConfetti(); if (loggedIn) sync(); }
     updateNext(false);
     const away = !isToday(sel) || !sameMonth(view, new Date());
     if (away && $('panel').hidden && Date.now() - lastActivity >= IDLE_RETURN_MS) goToday();
