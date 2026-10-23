@@ -41,7 +41,6 @@ const DEFAULTS = {
   surprise: true,  // пасхалка: конфетти в день выплаты (1 и 15) и по быстрым кликам на название месяца
   goalOn: false,   // панель «цель по заработку»
   goal: 0,         // цель на месяц, ₸ (0 = не задана)
-  goalHalf: 0,     // цель на половину месяца (1–15 или 16–конец), ₸ (0 = не задана)
   surpriseTime: '10:00', // во сколько в день выплаты показать сюрприз (окно само появится)
   fxDay: '',       // день, когда сюрприз уже показан
   statsOn: false,  // панель «статистика по студиям»
@@ -642,7 +641,6 @@ function updateSettings(patch) {
   if (['system', 'light', 'dark', 'glass'].includes(patch.theme)) next.theme = patch.theme;
   if (['month', 'first', 'second'].includes(patch.payPeriod)) next.payPeriod = patch.payPeriod;
   if (typeof patch.goal === 'number' && isFinite(patch.goal)) next.goal = Math.min(1e9, Math.max(0, Math.round(patch.goal)));
-  if (typeof patch.goalHalf === 'number' && isFinite(patch.goalHalf)) next.goalHalf = Math.min(1e9, Math.max(0, Math.round(patch.goalHalf)));
   if (typeof patch.surpriseTime === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(patch.surpriseTime)) { next.surpriseTime = patch.surpriseTime; next.fxDay = ''; }
   if (typeof patch.freeMin === 'number' && isFinite(patch.freeMin)) next.freeMin = Math.min(7, Math.max(2, Math.round(patch.freeMin)));
   if (typeof patch.glassBlur === 'number' && isFinite(patch.glassBlur)) next.glassBlur = Math.min(40, Math.max(0, Math.round(patch.glassBlur)));
