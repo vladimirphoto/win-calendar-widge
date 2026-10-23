@@ -251,7 +251,7 @@ function payCountdown() {
     if (!sameMonth(view, t)) return ''; // месяц уже прошёл
     // в этом месяце выплат больше нет: считаем до первого числа следующего
     const n1 = new Date(y, m + 1, 1), n = Math.round((n1 - t) / 864e5);
-    return `ЗП ${shortDate(n1)} через ${n} ${plural(n, 'день', 'дня', 'дней')}`;
+    return `ЗП через ${n} ${plural(n, 'день', 'дня', 'дней')}`;
   }
   const n = Math.round((next - t) / 864e5);
   return n === 0 ? 'ЗП сегодня' : `ЗП через ${n} ${plural(n, 'день', 'дня', 'дней')}`;
