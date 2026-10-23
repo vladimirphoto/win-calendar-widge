@@ -295,7 +295,7 @@ function renderInsights() {
       const done = list.filter(e => e.end.getTime() <= now).reduce((s, e) => s + payFor(e), 0);
       const wrap = mk('div');
       const gt = mk('div', 'gt');
-      const l = mk('span'); l.append('Набрано ', mk('b', '', money(done)), ' из ' + money(goal));
+      const l = mk('span'); l.append('Заработано ', mk('b', '', money(done)), ' из ' + money(goal));
       gt.append(l, mk('span', '', done >= goal ? 'цель достигнута' : 'осталось ' + money(goal - done)));
       const bar = mk('div', 'gbar');
       bar.title = `С запланированными сменами: ${money(planned)}`;
@@ -316,7 +316,7 @@ function renderInsights() {
       const rows = [...by.values()].sort((a, b) => b.sum - a.sum || b.n - a.n);
       if (rows.length) {
         const wrap = mk('div');
-        wrap.append(mk('div', 'sh', 'Студии за месяц'));
+        wrap.append(mk('div', 'sh', 'По студиям за месяц'));
         for (const r of rows) {
           const st = names.get(r.k);
           const row = mk('div', 'st');
