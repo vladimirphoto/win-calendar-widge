@@ -155,6 +155,9 @@ footer { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; al
 .earn .adv { font-size: 11.5px; font-weight: 500; color: var(--muted); }
 .earn[hidden] { display: none; }
 .earn { margin-left: auto; }
+.earn .cmp { margin-left: 6px; font-size: 11.5px; font-weight: 500; color: var(--muted); }
+.earn .cmp.up { color: var(--shift); }
+.earn .cmp.down { color: #e5484d; }
 .card.loading #ins, .card.loading #earn { opacity: .45; transition: opacity .15s; }
 
 /* панели под сеткой: цель, студии, свободные дни */

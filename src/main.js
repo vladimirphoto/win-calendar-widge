@@ -1,6 +1,6 @@
 const {
   app, BrowserWindow, Tray, Menu, ipcMain, shell, screen, nativeImage,
-  safeStorage, systemPreferences, powerMonitor, Notification
+  safeStorage, systemPreferences, powerMonitor, Notification, globalShortcut
 } = require('electron');
 const path = require('path');
 const fs = require('fs');
@@ -36,6 +36,9 @@ const DEFAULTS = {
   notify: true,    // уведомление Windows перед сменой
   notifyEve: '20:00', // для смен «на весь день»: во сколько напомнить накануне
   notifyHours: 2,  // за сколько часов
+  remindPay: true, // в выходной вечером напомнить внести заработок за смены без суммы
+  remindPayTime: '20:00',
+  hotkeyOn: true,  // глобальная клавиша показать/скрыть виджет (Win+Alt+C, запасная Ctrl+Alt+C)
   dayPay: {},      // сумма за конкретный день и студию: { '2026-10-22|#0b8043': 12000 }, заменяет ставку по умолчанию
   rates: {},       // ставка за смену по студиям: { '#0b8043': 25000 }, ключ = цвет метки
   surprise: true,  // пасхалка: конфетти в день выплаты (1 и 15) и по быстрым кликам на название месяца
@@ -146,7 +149,7 @@ function saveSettings() {
 }
 function publicSettings() {
   const { clientId, ...rest } = settings;
-  return { ...rest, customClient: !!clientId, packaged: app.isPackaged, canDeleteExe: !!process.env.PORTABLE_EXECUTABLE_FILE, version: app.getVersion() };
+  return { ...rest, hotkeyActive, customClient: !!clientId, packaged: app.isPackaged, canDeleteExe: !!process.env.PORTABLE_EXECUTABLE_FILE, version: app.getVersion() };
 }
 // какой OAuth-клиент использовать: свой из старых настроек, иначе вшитый
 function creds() {
@@ -560,6 +563,16 @@ function createWindow() {
   win.webContents.on('will-navigate', e => e.preventDefault());
 }
 
+// глобальная клавиша: Win+Alt+C, а если система её не отдаёт, Ctrl+Alt+C
+let hotkeyActive = '';
+function registerHotkey() {
+  try { globalShortcut.unregisterAll(); } catch {}
+  hotkeyActive = '';
+  if (!settings.hotkeyOn) return;
+  for (const [acc, label] of [['Super+Alt+C', 'Win+Alt+C'], ['Control+Alt+C', 'Ctrl+Alt+C']]) {
+    try { if (globalShortcut.register(acc, () => { if (win && win.isVisible() && win.isFocused()) win.hide(); else if (win) { win.show(); win.focus(); } })) { hotkeyActive = label; break; } } catch {}
+  }
+}
 function toggleWindow() {
   if (!win) return;
   if (win.isVisible()) win.hide(); else { win.show(); win.focus(); }
@@ -629,7 +642,7 @@ function applyWindowBehavior() {
 function updateSettings(patch) {
   const next = { ...settings };
   if (typeof patch.keywords === 'string') next.keywords = patch.keywords.slice(0, 200);
-  for (const k of ['autostart', 'alwaysOnTop', 'locked', 'onlyMine', 'notify', 'autoUpdate', 'goalOn', 'statsOn', 'freeOn', 'surprise', 'advanceOn']) {
+  for (const k of ['autostart', 'alwaysOnTop', 'locked', 'onlyMine', 'notify', 'autoUpdate', 'goalOn', 'statsOn', 'freeOn', 'surprise', 'advanceOn', 'remindPay', 'hotkeyOn']) {
     if (typeof patch[k] === 'boolean') next[k] = patch[k];
   }
   if (typeof patch.opacity === 'number' && isFinite(patch.opacity)) {
@@ -644,6 +657,7 @@ function updateSettings(patch) {
   if (typeof patch.surpriseTime === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(patch.surpriseTime)) { next.surpriseTime = patch.surpriseTime; next.fxDay = ''; }
   if (typeof patch.freeMin === 'number' && isFinite(patch.freeMin)) next.freeMin = Math.min(7, Math.max(2, Math.round(patch.freeMin)));
   if (typeof patch.glassBlur === 'number' && isFinite(patch.glassBlur)) next.glassBlur = Math.min(40, Math.max(0, Math.round(patch.glassBlur)));
+  if (typeof patch.remindPayTime === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(patch.remindPayTime)) next.remindPayTime = patch.remindPayTime;
   if (typeof patch.notifyEve === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(patch.notifyEve)) next.notifyEve = patch.notifyEve;
   if (patch.rates && typeof patch.rates === 'object' && !Array.isArray(patch.rates)) {
     const rates = {};
@@ -671,8 +685,10 @@ function updateSettings(patch) {
     entries.sort((a, b) => (a[0] < b[0] ? 1 : -1)); // новые даты первыми
     next.dayPay = Object.fromEntries(entries.slice(0, 1500));
   }
+  const hotkeyChanged = next.hotkeyOn !== settings.hotkeyOn;
   settings = next;
   saveSettings();
+  if (hotkeyChanged) registerHotkey();
   applyAutostart();
   applyWindowBehavior();
   rescheduleNotifications();
@@ -762,6 +778,10 @@ function registerIpc() {
     }
   });
   ipcMain.on('notify:shifts', (_e, list) => setShiftList(list));
+  ipcMain.on('notify:custom', (_e, m) => {
+    if (!settings.remindPay || !Notification.isSupported() || !m || typeof m.title !== 'string' || typeof m.body !== 'string') return;
+    showNote(m.title.slice(0, 80), m.body.slice(0, 200));
+  });
   ipcMain.handle('notify:test', () => {
     if (!Notification.isSupported()) return { ok: false, message: 'Уведомления не поддерживаются в этой системе' };
     // если уже есть ближайшая смена, показываем уведомление по её настоящим данным, иначе образец
@@ -808,6 +828,7 @@ if (!app.requestSingleInstanceLock()) {
     createWindow();
     createTray();
     applyAutostart();
+    registerHotkey();
 
     try {
       systemPreferences.on('accent-color-changed', () => send('sys:accent', accentHex()));
@@ -837,5 +858,6 @@ if (!app.requestSingleInstanceLock()) {
   });
 
   app.on('before-quit', () => { quitting = true; });
+  app.on('will-quit', () => { try { globalShortcut.unregisterAll(); } catch {} });
   app.on('window-all-closed', () => { /* живём в трее */ });
 }

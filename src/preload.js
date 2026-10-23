@@ -22,6 +22,7 @@ contextBridge.exposeInMainWorld('widget', {
   glassInfo: () => ipcRenderer.invoke('glass:info'),
   onGlassGeometry: cb => on('glass:geometry', cb),
   notifyTest: () => ipcRenderer.invoke('notify:test'),
+  notifyCustom: (title, body) => ipcRenderer.send('notify:custom', { title, body }),
   setShifts: list => ipcRenderer.send('notify:shifts', list),
   hide: () => ipcRenderer.send('window:hide'),
   fit: h => ipcRenderer.send('window:fit', h),
