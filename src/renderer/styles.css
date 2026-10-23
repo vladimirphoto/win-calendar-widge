@@ -125,9 +125,10 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 
 /* повестка дня */
 .agenda[hidden] { display: none; }
-.agenda { flex: 0 1 auto; min-height: 0; overflow: hidden; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); display: flex; flex-direction: column; }
-.agh { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
-.agenda h3 { font-size: 13px; font-weight: 600; text-transform: capitalize; }
+.agenda { flex: 0 1 auto; min-height: 80px; overflow: hidden; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); display: flex; flex-direction: column; }
+.agh { flex: none; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; margin-bottom: 8px; }
+.agenda h3 { font-size: 13px; font-weight: 600; white-space: nowrap; }
+.agenda h3::first-letter { text-transform: uppercase; }
 .list { overflow-y: auto; flex: 0 1 auto; min-height: 0; padding-right: 2px; }
 .ev {
   display: flex; gap: 10px; align-items: stretch; padding: 8px 10px 8px 0; margin-bottom: 6px;
@@ -153,6 +154,8 @@ footer { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; al
 .earn { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; }
 .earn .adv { font-size: 11.5px; font-weight: 500; color: var(--muted); }
 .earn[hidden] { display: none; }
+.earn { margin-left: auto; }
+.card.loading #ins, .card.loading #earn { opacity: .45; transition: opacity .15s; }
 
 /* панели под сеткой: цель, студии, свободные дни */
 .ins[hidden] { display: none; }

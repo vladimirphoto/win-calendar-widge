@@ -85,15 +85,30 @@ function indexEvents(list) {
 // примеров нет: пока вы не вошли в Google, календарь пустой и чистый
 function demoEvents() { return []; }
 
+let syncQueued = false;
+let loaded = null;        // за какой период загружены события: { from, to } (мс)
+let loadFailed = false;
+// данные для открытого месяца (с соседними неделями сетки) ещё не пришли
+function dataPending() {
+  if (!loggedIn || demo || loadFailed || !loaded) return false;
+  const a = new Date(view.getFullYear(), view.getMonth(), 1).getTime() - 7 * 864e5;
+  const b = new Date(view.getFullYear(), view.getMonth() + 1, 1).getTime() + 7 * 864e5;
+  return a < loaded.from || b > loaded.to;
+}
 async function sync() {
   if (!loggedIn) return;
-  if (syncing) return;
+  if (syncing) { syncQueued = true; return; } // быстрые клики по стрелкам: догружаем последний открытый месяц
   syncing = true;
   setStatus('busy', 'Синхронизация…');
   const from = new Date(view.getFullYear(), view.getMonth() - 1, 1);
   const to = new Date(view.getFullYear(), view.getMonth() + 2, 1);
-  const res = await api.getEvents({ from: from.toISOString(), to: to.toISOString() });
+  let res;
+  try { res = await api.getEvents({ from: from.toISOString(), to: to.toISOString() }); }
+  catch (e) { res = { ok: false, code: 'ERR', message: e?.message }; }
   syncing = false;
+  loadFailed = !res.ok;
+  if (res.ok) loaded = { from: from.getTime(), to: to.getTime() };
+  if (syncQueued) { syncQueued = false; if (dataPendingFor(from, to)) { sync(); return; } }
   if (res.ok) {
     demo = false;
     offline = !!res.offline;
@@ -115,6 +130,12 @@ async function sync() {
   } else {
     setStatus(res.code === 'OFFLINE' ? 'off' : 'err', res.code === 'OFFLINE' ? 'Нет интернета' : 'Ошибка: ' + (res.message || 'не удалось обновить'));
   }
+}
+
+function dataPendingFor(from, to) { // открытый сейчас месяц вышел за границы только что загруженного?
+  const a = new Date(view.getFullYear(), view.getMonth(), 1).getTime() - 7 * 864e5;
+  const b = new Date(view.getFullYear(), view.getMonth() + 1, 1).getTime() + 7 * 864e5;
+  return a < from.getTime() || b > to.getTime();
 }
 
 async function doLogin() {
@@ -156,7 +177,8 @@ function render() {
   const start = new Date(first); start.setDate(1 - ((first.getDay() + 6) % 7));
   const todayK = ymd(new Date()), selK = ymd(sel);
   const clean = isClean(); // имя не заполнено: никаких отметок смен и точек
-  const freeSet = settings?.freeOn && !clean ? new Set(freeRuns().flat().map(ymd)) : null;
+  const pending = dataPending(); // месяц ещё подгружается: не рисуем «свободные» дни по пустым данным
+  const freeSet = settings?.freeOn && !clean && !pending ? new Set(freeRuns().flat().map(ymd)) : null;
   let html = '';
   for (let i = 0; i < 42; i++) {
     const d = new Date(start); d.setDate(start.getDate() + i);
@@ -192,9 +214,9 @@ function render() {
   const n = monthShifts().length;
   let sub = n ? `${n} ${plural(n, 'смена', 'смены', 'смен')}` : '';
   $('sub').textContent = sub;
-  updateEarn();
+  document.getElementById('card').classList.toggle('loading', pending);
+  if (!pending) { updateEarn(); renderInsights(); }
   renderAdv();
-  renderInsights();
   renderAgenda();
   renderSeg();
   fitWindow();
@@ -239,7 +261,11 @@ function updateEarn() {
     const kids = [main];
     if (adv > 0) {
       const line = document.createElement('span'); line.className = 'adv';
-      line.textContent = `аванс −${money(adv)} · к выплате ${money(earn - adv)}`;
+      line.textContent = `аванс −${money(adv)} · к выплате ${money(Math.max(0, earn - adv))}`;
+      kids.push(line);
+    } else if (settings?.advanceOn && period !== 'month' && advFor(period === 'first' ? 'second' : 'first') > 0) {
+      const line = document.createElement('span'); line.className = 'adv';
+      line.textContent = `аванс ${period === 'first' ? '1–15' : `16–${lastDay}`} не указан`;
       kids.push(line);
     }
     const sig = kids.map(k => k.textContent).join('\n');
@@ -289,6 +315,8 @@ function renderInsights() {
   const kids = [];
   if (!isClean()) {
     const list = monthShifts();
+    const per = payPeriod();
+    const plist = list.filter(e => per === 'month' || (per === 'first') === (e.start.getDate() <= 15));
     if (settings?.goalOn && settings.goal > 0) {
       const goal = settings.goal, now = Date.now();
       const planned = list.reduce((s, e) => s + payFor(e), 0);
@@ -308,7 +336,7 @@ function renderInsights() {
     if (settings?.statsOn) {
       const names = new Map(studiosList().map(s => [s.key, s]));
       const by = new Map();
-      for (const e of list) {
+      for (const e of plist) {
         const k = rateKey(e.color);
         const it = by.get(k) || { k, n: 0, sum: 0 };
         it.n++; it.sum += payFor(e); by.set(k, it);
@@ -316,7 +344,8 @@ function renderInsights() {
       const rows = [...by.values()].sort((a, b) => b.sum - a.sum || b.n - a.n);
       if (rows.length) {
         const wrap = mk('div');
-        wrap.append(mk('div', 'sh', 'По студиям за месяц'));
+        const lastD = new Date(view.getFullYear(), view.getMonth() + 1, 0).getDate();
+        wrap.append(mk('div', 'sh', per === 'first' ? 'По студиям за 1–15' : per === 'second' ? `По студиям за 16–${lastD}` : 'По студиям за месяц'));
         for (const r of rows) {
           const st = names.get(r.k);
           const row = mk('div', 'st');
@@ -328,7 +357,8 @@ function renderInsights() {
         kids.push(wrap);
       }
     }
-    if (settings?.freeOn) {
+    const monthEnd = new Date(view.getFullYear(), view.getMonth() + 1, 0, 23, 59, 59);
+    if (settings?.freeOn && monthEnd >= new Date()) {
       const runs = freeRuns().filter(r => r.some(d => sameMonth(d, view)));
       const p = mk('div', 'fr2');
       if (runs.length) {
@@ -449,6 +479,7 @@ function renderPaySeg() {
 
 function applySettings(s) {
   settings = s;
+  fitFloor = 0;
   applyTheme(s);
   const gb = s.glassBlur ?? 20;
   document.documentElement.style.setProperty('--glass-blur', gb + 'px');
@@ -634,26 +665,36 @@ function renderSeg() {
 
 // окно подгоняется под содержимое, чтобы не оставалось пустого места
 let fitRaf = 0;
+let fitFloor = 0; // при листании месяцев окно не сжимается, чтобы не прыгало
+let lastFit = 0;
 function fitWindow() {
   cancelAnimationFrame(fitRaf);
   fitRaf = requestAnimationFrame(() => {
     if (!$('panel').hidden) return;
-    const list = $('agList');
-    const natural = $('card').offsetHeight - list.clientHeight + list.scrollHeight;
-    api.fit(natural + 32); // 32 = внешние отступы body
+    const card = $('card'), list = $('agList');
+    // меряем без ограничений по высоте окна, иначе при ещё не выросшем окне высота занижается и часть блоков (аванс) обрезается
+    const mh = card.style.maxHeight; card.style.maxHeight = 'none';
+    const natural = card.offsetHeight - list.clientHeight + list.scrollHeight;
+    card.style.maxHeight = mh;
+    lastFit = Math.max(natural + 32, fitFloor); // 32 = внешние отступы body
+    api.fit(lastFit);
   });
 }
+// после реального изменения размера окна пересчитываем ещё раз
+let resizeT = 0;
+window.addEventListener('resize', () => { clearTimeout(resizeT); resizeT = setTimeout(() => { if ($('panel').hidden) fitWindow(); }, 120); });
 function showCfgErr(m) { const el = $('cfgErr'); el.textContent = m; el.hidden = false; }
 function hideCfgErr() { $('cfgErr').hidden = true; }
 
 /* ---------- события интерфейса ---------- */
 function shiftMonth(delta) {
+  fitFloor = Math.max(fitFloor, lastFit);
   view = new Date(view.getFullYear(), view.getMonth() + delta, 1);
   render(); sync();
 }
 $('btnPrev').onclick = () => shiftMonth(-1);
 $('btnNext').onclick = () => shiftMonth(1);
-function goToday() { view = new Date(); view.setDate(1); view.setHours(0, 0, 0, 0); sel = new Date(); render(); sync(); }
+function goToday() { fitFloor = 0; view = new Date(); view.setDate(1); view.setHours(0, 0, 0, 0); sel = new Date(); render(); sync(); }
 $('btnToday').onclick = goToday;
 $('btnHide').onclick = () => api.hide();
 $('btnCfg').onclick = openPanel;
