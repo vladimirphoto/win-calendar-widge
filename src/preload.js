@@ -27,6 +27,7 @@ contextBridge.exposeInMainWorld('widget', {
   fit: h => ipcRenderer.send('window:fit', h),
   onAccent: cb => on('sys:accent', cb),
   onRefresh: cb => on('app:refresh', cb),
+  onPayday: cb => on('app:payday', cb),
   onLogin: cb => on('app:login', cb),
   onAuthChanged: cb => on('app:authChanged', cb),
   onSettings: cb => on('settings:changed', cb)

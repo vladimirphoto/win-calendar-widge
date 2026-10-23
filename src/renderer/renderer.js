@@ -213,6 +213,7 @@ function render() {
   // счётчик смен в отображаемом месяце
   const n = monthShifts().length;
   let sub = n ? `${n} ${plural(n, 'смена', 'смены', 'смен')}` : '';
+  if (!isClean()) sub += (sub ? ' · ' : '') + payCountdown();
   $('sub').textContent = sub;
   document.getElementById('card').classList.toggle('loading', pending);
   if (!pending) { updateEarn(); renderInsights(); }
@@ -238,6 +239,16 @@ function monthShifts() {
     }
   }
   return out;
+}
+
+// сколько дней до зарплаты (1 и 15 числа)
+function payCountdown() {
+  const t = new Date(); t.setHours(0, 0, 0, 0);
+  const day = t.getDate();
+  if (day === 1 || day === 15) return 'зп сегодня';
+  const next = day < 15 ? new Date(t.getFullYear(), t.getMonth(), 15) : new Date(t.getFullYear(), t.getMonth() + 1, 1);
+  const n = Math.round((next - t) / 864e5);
+  return `зп через ${n} ${plural(n, 'день', 'дня', 'дней')}`;
 }
 
 const PAY_POS = { month: 0, first: 1, second: 2 };
@@ -317,10 +328,11 @@ function renderInsights() {
     const list = monthShifts();
     const per = payPeriod();
     const plist = list.filter(e => per === 'month' || (per === 'first') === (e.start.getDate() <= 15));
-    if (settings?.goalOn && settings.goal > 0) {
-      const goal = settings.goal, now = Date.now();
-      const planned = list.reduce((s, e) => s + payFor(e), 0);
-      const done = list.filter(e => e.end.getTime() <= now).reduce((s, e) => s + payFor(e), 0);
+    const goal = per === 'month' ? settings?.goal : settings?.goalHalf; // за половину месяца своя цель
+    if (settings?.goalOn && goal > 0) {
+      const now = Date.now();
+      const planned = plist.reduce((s, e) => s + payFor(e), 0);
+      const done = plist.filter(e => e.end.getTime() <= now).reduce((s, e) => s + payFor(e), 0);
       const wrap = mk('div');
       const gt = mk('div', 'gt');
       const l = mk('span'); l.append('Заработано ', mk('b', '', money(done)), ' из ' + money(goal));
@@ -498,10 +510,12 @@ function applySettings(s) {
   $('tLock').checked = !!s.locked;
   $('tOnly').checked = !!s.onlyMine;
   $('devNote').hidden = !!s.packaged;
-  $('tGoal').checked = !!s.goalOn; $('rGoal').hidden = !s.goalOn;
+  $('tGoal').checked = !!s.goalOn; $('rGoal').hidden = !s.goalOn; $('rGoalHalf').hidden = !s.goalOn;
   $('tStats').checked = !!s.statsOn;
   $('tFree').checked = !!s.freeOn; $('rFree').hidden = !s.freeOn;
-  $('tFun').checked = s.surprise !== false;
+  $('tFun').checked = s.surprise !== false; $('rFun').hidden = s.surprise === false;
+  if (document.activeElement !== $('fFunTime')) $('fFunTime').value = s.surpriseTime || '10:00';
+  if (document.activeElement !== $('fGoalHalf')) $('fGoalHalf').value = s.goalHalf > 0 ? String(s.goalHalf) : '';
   $('tAdv').checked = !!s.advanceOn; $('advBox').hidden = !s.advanceOn;
   if (document.activeElement !== $('fGoal')) $('fGoal').value = s.goal > 0 ? String(s.goal) : '';
   if (document.activeElement !== $('fFreeMin')) $('fFreeMin').value = s.freeMin || 3;
@@ -831,6 +845,11 @@ $('fGoal').addEventListener('input', () => {
   clearTimeout(panelsTimer);
   panelsTimer = setTimeout(() => api.setSettings({ goal: Math.max(0, Number($('fGoal').value) || 0) }), 500);
 });
+$('fGoalHalf').addEventListener('input', () => {
+  clearTimeout(panelsTimer);
+  panelsTimer = setTimeout(() => api.setSettings({ goalHalf: Math.max(0, Number($('fGoalHalf').value) || 0) }), 500);
+});
+$('fFunTime').addEventListener('change', () => { if ($('fFunTime').value) api.setSettings({ surpriseTime: $('fFunTime').value }); });
 $('fFreeMin').addEventListener('input', () => {
   clearTimeout(panelsTimer);
   panelsTimer = setTimeout(() => { const n = Number($('fFreeMin').value); if (n >= 2) api.setSettings({ freeMin: n }); }, 500);
@@ -846,6 +865,7 @@ $('fNotifyH').addEventListener('input', () => {
 /* ---------- события от main ---------- */
 api.onAccent(applyAccent);
 api.onRefresh(() => sync());
+api.onPayday(() => paydayConfetti());
 api.onLogin(() => doLogin());
 api.onSettings(applySettings);
 api.onAuthChanged(v => { loggedIn = v; if (!v) { demo = true; upcoming = []; events = indexEvents(demoEvents()); setStatus('', 'Не подключено'); } updateButtons(); render(); updateNext(true); });
@@ -899,6 +919,8 @@ function paydayConfetti() {
   if (settings?.surprise === false) return;
   if (document.visibilityState !== 'visible') return; // окно скрыто в трей: покажем, когда его откроют
   const d = new Date(); if (d.getDate() !== 1 && d.getDate() !== 15) return;
+  const [fh, fm] = (settings?.surpriseTime || '10:00').split(':').map(Number);
+  if (d.getHours() * 60 + d.getMinutes() < fh * 60 + fm) return; // ещё рано: покажем в выбранное время
   const k = ymd(d);
   try { if (localStorage.getItem('payday-fx') === k) return; localStorage.setItem('payday-fx', k); } catch {}
   setTimeout(confetti, 700);
@@ -925,6 +947,7 @@ document.addEventListener('visibilitychange', paydayConfetti);
     const k = ymd(new Date());
     if (k !== lastDay) { lastDay = k; render(); paydayConfetti(); if (loggedIn) sync(); }
     updateNext(false);
+    paydayConfetti();
     const away = !isToday(sel) || !sameMonth(view, new Date());
     if (away && $('panel').hidden && Date.now() - lastActivity >= IDLE_RETURN_MS) goToday();
   }, 30 * 1000);

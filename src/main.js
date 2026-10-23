@@ -41,6 +41,9 @@ const DEFAULTS = {
   surprise: true,  // пасхалка: конфетти в день выплаты (1 и 15) и по быстрым кликам на название месяца
   goalOn: false,   // панель «цель по заработку»
   goal: 0,         // цель на месяц, ₸ (0 = не задана)
+  goalHalf: 0,     // цель на половину месяца (1–15 или 16–конец), ₸ (0 = не задана)
+  surpriseTime: '10:00', // во сколько в день выплаты показать сюрприз (окно само появится)
+  fxDay: '',       // день, когда сюрприз уже показан
   statsOn: false,  // панель «статистика по студиям»
   freeOn: false,   // подсветка серий свободных дней
   freeMin: 3,      // от скольких дней подряд считать серию
@@ -639,6 +642,8 @@ function updateSettings(patch) {
   if (['system', 'light', 'dark', 'glass'].includes(patch.theme)) next.theme = patch.theme;
   if (['month', 'first', 'second'].includes(patch.payPeriod)) next.payPeriod = patch.payPeriod;
   if (typeof patch.goal === 'number' && isFinite(patch.goal)) next.goal = Math.min(1e9, Math.max(0, Math.round(patch.goal)));
+  if (typeof patch.goalHalf === 'number' && isFinite(patch.goalHalf)) next.goalHalf = Math.min(1e9, Math.max(0, Math.round(patch.goalHalf)));
+  if (typeof patch.surpriseTime === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(patch.surpriseTime)) { next.surpriseTime = patch.surpriseTime; next.fxDay = ''; }
   if (typeof patch.freeMin === 'number' && isFinite(patch.freeMin)) next.freeMin = Math.min(7, Math.max(2, Math.round(patch.freeMin)));
   if (typeof patch.glassBlur === 'number' && isFinite(patch.glassBlur)) next.glassBlur = Math.min(40, Math.max(0, Math.round(patch.glassBlur)));
   if (typeof patch.notifyEve === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(patch.notifyEve)) next.notifyEve = patch.notifyEve;
@@ -814,6 +819,21 @@ if (!app.requestSingleInstanceLock()) {
     setInterval(() => checkForUpdates({ auto: true }), 6 * 3600 * 1000);
     const advanceTick = () => { if (pruneAdvanceNow()) { saveSettings(); send('settings:changed', publicSettings()); } };
     setInterval(advanceTick, 15 * 60 * 1000);
+    // сюрприз в день выплаты (1 и 15) в выбранное время: окно появляется само, даже если оно было скрыто в трее
+    const paydayTick = () => {
+      if (settings.surprise === false || !win || win.isDestroyed()) return;
+      const d = new Date(), day = d.getDate();
+      if (day !== 1 && day !== 15) return;
+      const key = `${d.getFullYear()}-${d.getMonth() + 1}-${day}`;
+      if (settings.fxDay === key) return;
+      const [h, m] = (settings.surpriseTime || '10:00').split(':').map(Number);
+      if (d.getHours() * 60 + d.getMinutes() < h * 60 + m) return;
+      settings.fxDay = key; saveSettings();
+      if (!win.isVisible()) win.showInactive();
+      setTimeout(() => send('app:payday'), 800);
+    };
+    setInterval(paydayTick, 30 * 1000);
+    setTimeout(paydayTick, 5000);
     powerMonitor.on('resume', () => { setTimeout(() => send('app:refresh'), 4000); advanceTick(); });
     powerMonitor.on('unlock-screen', () => send('app:refresh'));
   });
