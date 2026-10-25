@@ -511,18 +511,18 @@ function applySettings(s) {
   settings = s;
   fitFloor = 0;
   applyTheme(s);
-  const gb = s.glassBlur ?? 20;
+  const gb = sliderBusy('fBlur') ? Number($('fBlur').value) : (s.glassBlur ?? 20);
   document.documentElement.style.setProperty('--glass-blur', gb + 'px');
   // чем резче стекло, тем ближе цвета к настоящим обоям; насыщенность растёт вместе с размытием
   document.documentElement.style.setProperty('--glass-sat', String(+(1 + 0.8 * Math.min(1, gb / 20)).toFixed(2)));
-  if (document.activeElement !== $('fBlur')) $('fBlur').value = s.glassBlur ?? 20;
+  if (!sliderBusy('fBlur')) $('fBlur').value = s.glassBlur ?? 20;
   renderPaySeg();
   if (!advTimer) advance = { ...(s.advance || {}) };
   if (!payTimer) dayPay = { ...(s.dayPay || {}) }; // пока человек вводит сумму, локальные значения главнее
-  document.documentElement.style.setProperty('--alpha', String(s.opacity));
+  if (!sliderBusy('fOpacity')) document.documentElement.style.setProperty('--alpha', String(s.opacity));
   document.body.classList.toggle('locked', !!s.locked);
   $('fKeys').value = s.keywords;
-  $('fOpacity').value = Math.round(s.opacity * 100);
+  if (!sliderBusy('fOpacity')) $('fOpacity').value = Math.round(s.opacity * 100);
   $('tAuto').checked = !!s.autostart;
   $('tTop').checked = !!s.alwaysOnTop;
   $('tLock').checked = !!s.locked;
@@ -753,14 +753,28 @@ document.addEventListener('keydown', e => {
 
 let keysTimer;
 $('fKeys').addEventListener('input', () => { clearTimeout(keysTimer); keysTimer = setTimeout(() => api.setSettings({ keywords: $('fKeys').value }), 300); });
-$('fOpacity').addEventListener('input', () => api.setSettings({ opacity: Number($('fOpacity').value) / 100 }));
+// ползунки: пока ползунок зажат, ответ от main не должен возвращать его на старое место
+const sliderDown = new Set();
+function sliderBusy(id) { return sliderDown.has(id) || document.activeElement === $(id); }
+for (const id of ['fOpacity', 'fBlur']) {
+  const el = $(id);
+  el.addEventListener('pointerdown', () => sliderDown.add(id));
+  for (const ev of ['pointerup', 'pointercancel', 'blur']) el.addEventListener(ev, () => setTimeout(() => sliderDown.delete(id), 300));
+}
+let sliderSaveT;
+function saveSliderSoon(patch) { clearTimeout(sliderSaveT); sliderSaveT = setTimeout(() => api.setSettings(patch), 60); }
+$('fOpacity').addEventListener('input', () => {
+  const v = Number($('fOpacity').value) / 100;
+  document.documentElement.style.setProperty('--alpha', String(v)); // видно сразу
+  saveSliderSoon({ opacity: v });
+});
 $('tAuto').onchange = () => api.setSettings({ autostart: $('tAuto').checked });
 $('segAll').onclick = () => api.setSettings({ onlyMine: false });
 $('segMine').onclick = () => {
   if (!hasAnyNames()) { openPanel(); $('fKeys').focus(); return; }
   api.setSettings({ onlyMine: true });
 };
-$('fBlur').addEventListener('input', () => api.setSettings({ glassBlur: Number($('fBlur').value) }));
+$('fBlur').addEventListener('input', () => saveSliderSoon({ glassBlur: Number($('fBlur').value) }));
 $('themeSeg').addEventListener('click', e => {
   const b = e.target.closest('button[data-theme]');
   if (b) api.setSettings({ theme: b.dataset.theme });
