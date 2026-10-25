@@ -67,6 +67,6 @@ function makePng(size) {
 module.exports = { makePng };
 
 if (require.main === module) {
-  fs.writeFileSync(path.join(__dirname, 'icon.png'), makePng(256));
+  fs.writeFileSync(path.join(__dirname, 'icon.png'), makePng(512));
   console.log('build/icon.png создан');
 }
