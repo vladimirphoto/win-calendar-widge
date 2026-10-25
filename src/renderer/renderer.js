@@ -523,6 +523,7 @@ function applySettings(s) {
   document.body.classList.toggle('locked', !!s.locked);
   $('fKeys').value = s.keywords;
   if (!sliderBusy('fOpacity')) $('fOpacity').value = Math.round(s.opacity * 100);
+  renderCloud(s.cloud);
   $('tAuto').checked = !!s.autostart;
   $('tTop').checked = !!s.alwaysOnTop;
   $('tLock').checked = !!s.locked;
@@ -753,6 +754,22 @@ document.addEventListener('keydown', e => {
 
 let keysTimer;
 $('fKeys').addEventListener('input', () => { clearTimeout(keysTimer); keysTimer = setTimeout(() => api.setSettings({ keywords: $('fKeys').value }), 300); });
+function renderCloud(c) {
+  const el = $('cloudHint'); if (!el) return;
+  const st = c && c.state;
+  const hhmm = c && c.at ? new Date(c.at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : '';
+  const T = {
+    syncing: 'Облако: синхронизирую…',
+    ok: 'Облако: данные сохранены в вашем Google-аккаунте' + (hhmm ? ' · ' + hhmm : ''),
+    reauth: 'Облако выключено: нажмите «Войти через Google» ещё раз и разрешите доступ к Drive',
+    api: 'Облако недоступно: администратору нужно включить Google Drive API',
+    offline: 'Облако: нет интернета, отправлю позже',
+    error: 'Облако: не удалось синхронизировать'
+  };
+  el.textContent = T[st] || '';
+  el.hidden = !T[st];
+  el.classList.toggle('bad', st === 'reauth' || st === 'api' || st === 'error');
+}
 // ползунки: пока ползунок зажат, ответ от main не должен возвращать его на старое место
 const sliderDown = new Set();
 function sliderBusy(id) { return sliderDown.has(id) || document.activeElement === $(id); }

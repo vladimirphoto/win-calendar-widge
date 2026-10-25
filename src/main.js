@@ -12,11 +12,12 @@ const EMBEDDED = require('./google-client');
 const { createUpdater } = require('./updater');
 const { pruneAdvance } = require('./advance');
 const UPDATE_CFG = require('./update-config');
+const Cloud = require('./cloud');
 
 // Идентификатор приложения для уведомлений Windows; название и значок для заголовка уведомления регистрируются в реестре (registerToastIdentity)
 const APP_ID = 'CalendarWidget';
 const APP_TITLE = 'Календарь';
-const SCOPE = 'https://www.googleapis.com/auth/calendar.readonly';
+const SCOPE = 'https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/drive.appdata';
 const WIN_W = 420;
 const WIN_H = 660;
 const WIN_MIN_H = 300;
@@ -51,6 +52,9 @@ const DEFAULTS = {
   payPeriod: 'month', // за какой период показывать заработок: 'month' весь месяц | 'first' 1–15 | 'second' 16–конец
   theme: 'system', // 'system' | 'light' | 'dark' | 'glass'
   glassBlur: 20,   // размытие обоев под «Стеклом», px
+  cloudAt: 0,      // когда личные данные менялись в последний раз (для облака)
+  cloudAcct: '',   // чьи это данные (Google-аккаунт), чтобы данные одного сотрудника не попали к другому
+  cloudDirty: false, // есть изменения, ещё не отправленные в облако
   bounds: null
 };
 
@@ -146,7 +150,7 @@ function saveSettings() {
 }
 function publicSettings() {
   const { clientId, ...rest } = settings;
-  return { ...rest, customClient: !!clientId, packaged: app.isPackaged, canDeleteExe: !!process.env.PORTABLE_EXECUTABLE_FILE, version: app.getVersion() };
+  return { ...rest, cloud: cloudState, customClient: !!clientId, packaged: app.isPackaged, canDeleteExe: !!process.env.PORTABLE_EXECUTABLE_FILE, version: app.getVersion() };
 }
 // какой OAuth-клиент использовать: свой из старых настроек, иначе вшитый
 function creds() {
@@ -672,12 +676,93 @@ function updateSettings(patch) {
     entries.sort((a, b) => (a[0] < b[0] ? 1 : -1)); // новые даты первыми
     next.dayPay = Object.fromEntries(entries.slice(0, 1500));
   }
+  if (!applyingRemote && !Cloud.same(Cloud.pick(settings), Cloud.pick(next))) { next.cloudAt = Date.now(); next.cloudDirty = true; scheduleCloudPush(); }
   settings = next;
   saveSettings();
   applyAutostart();
   applyWindowBehavior();
   rescheduleNotifications();
   refreshTray();
+  send('settings:changed', publicSettings());
+}
+
+/* ---------- облако: личные данные в скрытой папке Google Drive сотрудника ---------- */
+let cloudState = { state: refreshToken ? 'idle' : 'off', at: 0 }; // off | idle | syncing | ok | reauth | api | offline | error
+let applyingRemote = false;
+let cloudBusy = false;
+let cloudPushTimer = null;
+let cloudFileId = null;
+const cloudApi = Cloud.createCloud({ getToken: getAccessToken, fetchFn: net });
+
+function setCloud(st, extra) {
+  cloudState = { ...cloudState, state: st, ...(extra || {}) };
+  send('settings:changed', publicSettings());
+}
+function applyPersonal(data) {
+  applyingRemote = true;
+  try { updateSettings({ ...Cloud.pick(DEFAULTS), ...data }); } finally { applyingRemote = false; }
+}
+function resetEventCache() {
+  cache = { ranges: {} };
+  clearTimeout(cacheTimer);
+  try { fs.rmSync(cacheFile(), { force: true }); } catch {}
+}
+function scheduleCloudPush() {
+  clearTimeout(cloudPushTimer);
+  cloudPushTimer = setTimeout(() => { syncCloud(); }, 4000);
+}
+async function syncCloud() {
+  if (cloudBusy || !refreshToken) return;
+  cloudBusy = true;
+  setCloud('syncing');
+  try {
+    const email = await cloudApi.whoami();
+    cloudFileId = await cloudApi.find();
+    const remote = cloudFileId ? await cloudApi.download(cloudFileId) : null;
+    const local = { at: settings.cloudAt || 0, acct: settings.cloudAcct || '', dirty: !!settings.cloudDirty, hasData: Cloud.hasData(settings, DEFAULTS) };
+    const act = Cloud.decide({ local, remote, email });
+    if (act === 'replace') {
+      // на этом компьютере были данные другого сотрудника: стираем их, берём данные этого аккаунта
+      resetEventCache();
+      applyPersonal(remote ? remote.data : {});
+      settings.cloudAt = remote ? remote.at : 0; settings.cloudDirty = false; settings.cloudAcct = email;
+      saveSettings(); send('app:refresh');
+    } else if (act === 'pull') {
+      applyPersonal(remote.data);
+      settings.cloudAt = remote.at; settings.cloudDirty = false; settings.cloudAcct = email;
+      saveSettings(); send('app:refresh');
+    } else if (act === 'push') {
+      const at = settings.cloudAt || Date.now();
+      const snapshot = Cloud.pick(settings);
+      cloudFileId = await cloudApi.upload(cloudFileId, { at, data: snapshot });
+      if (settings.cloudAt === at) { settings.cloudDirty = false; settings.cloudAt = at; } // если за время отправки данные снова менялись, останутся «грязными»
+      settings.cloudAcct = email;
+      saveSettings();
+    } else if (settings.cloudAcct !== email) {
+      settings.cloudAcct = email; saveSettings();
+    }
+    setCloud('ok', { at: Date.now() });
+  } catch (e) {
+    const st = e.code === 'OFFLINE' ? 'offline' : e.code === 'API_OFF' ? 'api' : e.code === 'SCOPE' ? 'reauth' : e.code === 'NOT_AUTH' ? 'off' : 'error';
+    setCloud(st);
+    if (st === 'error') console.error('cloud sync failed', e.message);
+  } finally { cloudBusy = false; }
+}
+// выход: сначала отправить несохранённое, потом убрать личные данные с компьютера, чтобы следующий сотрудник их не увидел
+async function signOut() {
+  clearTimeout(cloudPushTimer);
+  if (refreshToken && settings.cloudDirty) {
+    try { await Promise.race([syncCloud(), new Promise(res => setTimeout(res, 6000))]); } catch {}
+    for (let i = 0; i < 20 && cloudBusy; i++) await new Promise(res => setTimeout(res, 250));
+  }
+  clearAuth();
+  if (!settings.cloudDirty) {
+    resetEventCache();
+    applyPersonal({});
+    settings.cloudAt = 0; saveSettings();
+    send('app:refresh');
+  }
+  cloudState = { state: 'off', at: 0 };
   send('settings:changed', publicSettings());
 }
 
@@ -704,7 +789,7 @@ function refreshTray() {
     },
     { type: 'separator' },
     refreshToken
-      ? { label: 'Выйти из Google', click: () => { clearAuth(); send('app:authChanged', false); } }
+      ? { label: 'Выйти из Google', click: () => { signOut().then(() => send('app:authChanged', false)); } }
       : { label: 'Войти в Google', click: () => { win?.show(); send('app:login'); } },
     { type: 'separator' },
     { label: 'Выход', click: () => { quitting = true; app.quit(); } }
@@ -738,10 +823,10 @@ function registerIpc() {
   });
   ipcMain.handle('auth:status', () => ({ loggedIn: !!refreshToken }));
   ipcMain.handle('auth:login', async () => {
-    try { await login(); return { ok: true }; }
+    try { await login(); syncCloud(); return { ok: true }; }
     catch (e) { return { ok: false, message: e.message || String(e) }; }
   });
-  ipcMain.handle('auth:logout', () => { clearAuth(); return { ok: true }; });
+  ipcMain.handle('auth:logout', async () => { await signOut(); return { ok: true }; });
   ipcMain.handle('events:get', async (_e, range) => {
     try {
       const from = new Date(range?.from), to = new Date(range?.to);
@@ -811,6 +896,8 @@ if (!app.requestSingleInstanceLock()) {
     createWindow();
     createTray();
     applyAutostart();
+    setTimeout(syncCloud, 6000);
+    setInterval(syncCloud, 10 * 60 * 1000);
 
     try {
       systemPreferences.on('accent-color-changed', () => send('sys:accent', accentHex()));
@@ -835,7 +922,7 @@ if (!app.requestSingleInstanceLock()) {
     };
     setInterval(paydayTick, 30 * 1000);
     setTimeout(paydayTick, 5000);
-    powerMonitor.on('resume', () => { setTimeout(() => send('app:refresh'), 4000); advanceTick(); });
+    powerMonitor.on('resume', () => { setTimeout(() => send('app:refresh'), 4000); setTimeout(syncCloud, 6000); advanceTick(); });
     powerMonitor.on('unlock-screen', () => send('app:refresh'));
   });
 
