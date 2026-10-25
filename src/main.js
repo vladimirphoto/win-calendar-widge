@@ -539,6 +539,7 @@ function createWindow() {
     }
   });
 
+  if (process.platform === 'darwin') win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true }); // виджет виден на всех рабочих столах
   win.loadFile(path.join(__dirname, 'renderer', 'index.html'));
   win.once('ready-to-show', () => win.show());
 
@@ -690,7 +691,7 @@ function refreshTray() {
     { label: 'Проверить обновления виджета', click: () => { win?.show(); checkForUpdates({ auto: false }); } },
     { type: 'separator' },
     {
-      label: 'Запускать при старте Windows', type: 'checkbox', checked: !!settings.autostart,
+      label: process.platform === 'darwin' ? 'Запускать при входе в систему' : 'Запускать при старте Windows', type: 'checkbox', checked: !!settings.autostart,
       click: i => updateSettings({ autostart: i.checked })
     },
     {
@@ -712,7 +713,8 @@ function refreshTray() {
 }
 
 function createTray() {
-  const img = nativeImage.createFromPath(iconPath).resize({ width: 32, height: 32 });
+  const sz = process.platform === 'darwin' ? 18 : 32; // в строке меню Mac значок мелкий
+  const img = nativeImage.createFromPath(iconPath).resize({ width: sz, height: sz });
   tray = new Tray(img);
   tray.setToolTip('Календарь');
   tray.on('click', toggleWindow);
@@ -798,6 +800,7 @@ if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
   app.on('second-instance', () => { if (win) { win.show(); win.focus(); } });
+  app.on('activate', () => { if (win && !win.isDestroyed() && !win.isVisible()) { win.show(); win.focus(); } }); // Mac: клик по значку приложения
 
   app.whenReady().then(() => {
     loadSettings();

@@ -8,7 +8,8 @@
   "scripts": {
     "icon": "node build/gen-icon.js",
     "start": "npm run icon && electron .",
-    "dist": "npm run icon && electron-builder --win portable --x64"
+    "dist": "npm run icon && electron-builder --win portable --x64",
+    "dist:mac": "npm run icon && electron-builder --mac dir --arm64"
   },
   "devDependencies": {
     "electron": "^33.0.0",
@@ -22,6 +23,13 @@
     "win": {
       "target": [{ "target": "portable", "arch": ["x64"] }],
       "icon": "build/icon.png"
+    },
+    "mac": {
+      "target": [{ "target": "dir", "arch": ["arm64"] }],
+      "icon": "build/icon.png",
+      "category": "public.app-category.productivity",
+      "identity": null,
+      "extendInfo": { "LSUIElement": true }
     },
     "portable": {
       "artifactName": "CalendarWidget.exe"

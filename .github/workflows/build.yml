@@ -31,3 +31,33 @@ jobs:
           tag_name: latest
           name: CalendarWidget 1.0.${{ github.run_number }}
           files: dist/CalendarWidget.exe
+
+  mac:
+    # Mac на Apple Silicon (M1 и новее); архив добавляется в тот же релиз latest рядом с exe
+    needs: build
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Set version from run number
+        run: npm version "1.0.${{ github.run_number }}" --no-git-tag-version
+      - run: npm install
+      - run: npm run dist:mac
+      - name: Ad-hoc signature and zip
+        run: |
+          APP=$(ls -d dist/mac-arm64/*.app | head -n 1)
+          codesign --force --deep --sign - "$APP"
+          codesign --verify --deep --strict "$APP"
+          lipo -archs "$APP/Contents/MacOS/CalendarWidget"
+          ditto -c -k --sequesterRsrc --keepParent "$APP" dist/CalendarWidget-mac-arm64.zip
+          ls -l dist/CalendarWidget-mac-arm64.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CalendarWidget-mac
+          path: dist/CalendarWidget-mac-arm64.zip
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          files: dist/CalendarWidget-mac-arm64.zip

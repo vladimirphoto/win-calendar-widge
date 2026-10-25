@@ -46,7 +46,7 @@ function createUpdater(deps) {
     if (busy) return state;
     busy = true;
     try {
-      if (!supported()) return set({ state: 'unsupported', message: 'Автообновление работает только в собранном exe' });
+      if (!supported()) return set({ state: 'unsupported', message: process.platform === 'darwin' ? 'На Mac обновляйте вручную: скачайте новый архив из Releases' : 'Автообновление работает только в собранном exe' });
       set({ state: 'checking', message: '' });
       let r;
       try {
@@ -73,7 +73,7 @@ function createUpdater(deps) {
     if (busy) return state;
     if (!found) return set({ state: 'error', code: 'NONE', message: 'Сначала проверьте обновления' });
     const target = getExePath();
-    if (!target) return set({ state: 'unsupported', message: 'Автообновление работает только в собранном exe' });
+    if (!target) return set({ state: 'unsupported', message: process.platform === 'darwin' ? 'На Mac обновляйте вручную: скачайте новый архив из Releases' : 'Автообновление работает только в собранном exe' });
     busy = true;
     const { asset, version } = found;
     const tmp = path.join(path.dirname(target), 'CalendarWidget.update.exe');
