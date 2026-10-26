@@ -8,8 +8,8 @@
   "scripts": {
     "icon": "node build/gen-icon.js",
     "start": "npm run icon && electron .",
-    "dist": "npm run icon && electron-builder --win portable nsis --x64",
-    "dist:mac": "npm run icon && electron-builder --mac dir --arm64"
+    "dist": "npm run icon && electron-builder --win portable nsis --x64 --publish never",
+    "dist:mac": "npm run icon && electron-builder --mac dir --arm64 --publish never"
   },
   "devDependencies": {
     "electron": "^33.0.0",
