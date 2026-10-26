@@ -21,7 +21,15 @@ jobs:
         shell: bash
         run: npm version "1.0.${{ github.run_number }}" --no-git-tag-version
       - run: npm install
-      - run: npm run dist
+      - name: Build (portable + installer)
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run dist 2>&1 | tee build.log || {
+            MSG=$(grep -v '^    at ' build.log | tail -n 30 | sed ':a;N;$!ba;s/\n/%0A/g' | cut -c1-3500)
+            echo "::error title=npm run dist failed::$MSG"
+            exit 1
+          }
       - uses: actions/upload-artifact@v4
         with:
           name: CalendarWidget
