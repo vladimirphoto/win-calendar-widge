@@ -53,8 +53,9 @@
   --line: rgba(255, 255, 255, .17);
   --hover: rgba(255, 255, 255, .15);
   --press: rgba(255, 255, 255, .09);
-  --shift: #32d74b;
-  --shift-bg: rgba(50, 215, 75, .22);
+  /* цвет смен и заработка берётся из цвета системы Windows, осветлённый, чтобы читался на стекле */
+  --shift: color-mix(in srgb, var(--accent) 62%, #fff);
+  --shift-bg: color-mix(in srgb, var(--accent) 26%, transparent);
 }
 
 * { box-sizing: border-box; margin: 0; }
