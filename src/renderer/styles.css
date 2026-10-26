@@ -313,9 +313,9 @@ input[type=time]::-webkit-calendar-picker-indicator { filter: invert(.6); cursor
   mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
 }
 :root[data-theme="glass"] .panel { background: rgba(18, 22, 34, .92); border-radius: inherit; }
-:root[data-theme="glass"] .day { border-radius: 12px; }
+:root[data-theme="glass"] .day, :root[data-theme="ios"] .day { border-radius: 12px; }
 :root[data-theme="glass"] .ev { border-radius: 12px; border-color: rgba(255, 255, 255, .2); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .18); }
-:root[data-theme="glass"] .chip { border-radius: 10px; }
+:root[data-theme="glass"] .chip, :root[data-theme="ios"] #btnToday { border-radius: 10px; }
 :root[data-theme="glass"] .panel .chip:not(.primary), :root[data-theme="glass"] #btnToday { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .25); }
 :root[data-theme="glass"] input[type=text], :root[data-theme="glass"] input[type=password],
 :root[data-theme="glass"] input[type=number], :root[data-theme="glass"] input[type=time] { border-radius: 10px; border-color: rgba(255, 255, 255, .2); border-bottom-color: rgba(255, 255, 255, .45); background: rgba(255, 255, 255, .1); }
@@ -329,7 +329,7 @@ input[type=time]::-webkit-calendar-picker-indicator { filter: invert(.6); cursor
   :root[data-theme="glass"] .card { background: rgba(24, 28, 40, .94); }
 }
 
-:root[data-theme="glass"] .day.today { color: #fff; }
+:root[data-theme="glass"] .day.today, :root[data-theme="ios"] .day.today { color: #fff; }
 :root[data-theme="glass"] ::placeholder { color: rgba(255, 255, 255, .42); }
 .field[hidden] { display: none; }
 
@@ -405,55 +405,19 @@ input[type=time]::-webkit-calendar-picker-indicator { filter: invert(.6); cursor
 :root[data-theme="ios"] .grip i { background: #fff; opacity: .4; width: 36px; height: 5px; border-radius: 3px; }
 
 /* шапка: крупный заголовок, стеклянные круглые кнопки */
-:root[data-theme="ios"] header { margin-bottom: 10px; }
-:root[data-theme="ios"] .month { font-family: var(--font-display); font-size: 23px; font-weight: 700; letter-spacing: -.02em; white-space: nowrap; }
-:root[data-theme="ios"] .month small { color: #ff453a; font-size: 14px; font-weight: 600; margin-left: 5px; }
-:root[data-theme="ios"] .sub { color: var(--muted); font-size: 12px; white-space: nowrap; }
-:root[data-theme="ios"] .tools { gap: 5px; flex: none; }
-:root[data-theme="ios"] .ttl { min-width: 0; }
-:root[data-theme="ios"] .ib {
-  width: 30px; height: 30px; border-radius: 50%;
-  background: rgba(255, 255, 255, .15);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .45), inset 0 -1px 0 rgba(255, 255, 255, .08), 0 1px 3px rgba(0, 0, 0, .2);
-  transition: background .15s, transform .15s cubic-bezier(.32, .72, .24, 1);
-}
-:root[data-theme="ios"] .ib:hover { background: rgba(255, 255, 255, .24); }
-:root[data-theme="ios"] .ib:active { transform: scale(.92); background: rgba(255, 255, 255, .3); }
-:root[data-theme="ios"] .ib svg { stroke-width: 1.8; }
-:root[data-theme="ios"] .chip, :root[data-theme="ios"] #btnToday {
+:root[data-theme="ios"] .panel .chip {
   border-radius: 999px; font-weight: 600; font-size: 13px; padding: 6px 12px; border: 0;
   background: rgba(255, 255, 255, .16);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, .45), inset 0 -1px 0 rgba(255, 255, 255, .08), 0 1px 3px rgba(0, 0, 0, .2);
-  transition: background .15s, transform .15s cubic-bezier(.32, .72, .24, 1);
+  transition: background .15s;
 }
-:root[data-theme="ios"] .chip:hover, :root[data-theme="ios"] #btnToday:hover { background: rgba(255, 255, 255, .26); }
-:root[data-theme="ios"] .chip:active, :root[data-theme="ios"] #btnToday:active { transform: scale(.96); background: rgba(255, 255, 255, .32); }
-:root[data-theme="ios"] .chip.primary { background: #0a84ff; color: #fff; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .4), 0 2px 8px rgba(10, 132, 255, .4); }
-:root[data-theme="ios"] .chip.primary:hover { background: #3b9dff; filter: none; }
-:root[data-theme="ios"] .panel .chip:not(.primary), :root[data-theme="ios"] #btnToday { border: 0; }
-:root[data-theme="ios"] .panel .chip:not(.primary):hover, :root[data-theme="ios"] #btnToday:hover { background: rgba(255, 255, 255, .26); border: 0; }
+:root[data-theme="ios"] .panel .chip:hover { background: rgba(255, 255, 255, .26); }
+:root[data-theme="ios"] .panel .chip:active { background: rgba(255, 255, 255, .32); }
+:root[data-theme="ios"] .panel .chip.primary { background: #0a84ff; color: #fff; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .4), 0 2px 8px rgba(10, 132, 255, .4); }
+:root[data-theme="ios"] .panel .chip.primary:hover { background: #3b9dff; filter: none; }
+:root[data-theme="ios"] .panel .chip:not(.primary):hover { background: rgba(255, 255, 255, .26); border: 0; }
 
 /* дни недели и круглые дни */
-:root[data-theme="ios"] .dow { font-size: 11.5px; font-weight: 600; color: var(--muted); letter-spacing: .02em; text-transform: uppercase; }
-:root[data-theme="ios"] .days { gap: 3px; }
-:root[data-theme="ios"] .day { isolation: isolate; background: none !important; font-size: 17px; font-weight: 400; border-radius: 0; }
-:root[data-theme="ios"] .day::before { content: ""; position: absolute; z-index: -1; left: 50%; top: 50%; width: 38px; height: 38px; margin: -19px 0 0 -19px; border-radius: 50%; transition: background .15s, box-shadow .15s; }
-:root[data-theme="ios"] .day:hover::before { background: rgba(255, 255, 255, .14); }
-:root[data-theme="ios"] .day.shift { font-weight: 600; }
-:root[data-theme="ios"] .day.shift::before { background: color-mix(in srgb, var(--sc, #32d74b) 42%, transparent); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .35); }
-:root[data-theme="ios"] .day.shift::after { display: none; }
-:root[data-theme="ios"] .day.free:not(.shift) { outline: 0; }
-:root[data-theme="ios"] .day.free:not(.shift)::before { box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, .32); }
-:root[data-theme="ios"] .day.today { color: #fff; font-weight: 700; }
-:root[data-theme="ios"] .day.today::before, :root[data-theme="ios"] .day.today:not(.shift)::before { background: #ff453a; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .4), 0 2px 8px rgba(255, 69, 58, .45); }
-:root[data-theme="ios"] .day.today.shift::before { background: color-mix(in srgb, var(--sc, #32d74b) 42%, transparent); box-shadow: inset 0 0 0 2px #ff453a; }
-:root[data-theme="ios"] .day.sel:not(.today)::before { background: rgba(255, 255, 255, .92); box-shadow: 0 2px 8px rgba(0, 0, 0, .25); }
-:root[data-theme="ios"] .day.sel:not(.today) { color: #111; font-weight: 700; }
-:root[data-theme="ios"] .day.sel { box-shadow: none; }
-:root[data-theme="ios"] .day.sel.today::before { box-shadow: inset 0 0 0 2px #fff, 0 2px 8px rgba(255, 69, 58, .45); }
-:root[data-theme="ios"] .day.other { opacity: .4; }
-:root[data-theme="ios"] .dots { bottom: 4px; gap: 3px; }
-:root[data-theme="ios"] .dot { width: 5px; height: 5px; box-shadow: 0 0 0 1px rgba(0, 0, 0, .18); }
 
 /* панели под сеткой и список дня */
 :root[data-theme="ios"] .ins { border-top: 0; padding-top: 4px; margin-top: 6px; }
@@ -538,3 +502,18 @@ input[type=time]::-webkit-calendar-picker-indicator { filter: invert(.6); cursor
   :root[data-theme="ios"] .glassbg { display: none; }
   :root[data-theme="ios"] .card { background: rgba(28, 30, 40, .94); }
 }
+
+/* iOS: размеры текста в настройках меньше, сумма не налезает на единицу, кнопка «Проверить» стоит на месте по центру */
+:root[data-theme="ios"] .panel h2 { font-size: 20px; }
+:root[data-theme="ios"] .sect { font-size: 11.5px; margin: 20px 16px 6px; }
+:root[data-theme="ios"] .grp .toggle { font-size: 14px; padding: 10px 0; }
+:root[data-theme="ios"] .grp .rate { min-height: 42px; }
+:root[data-theme="ios"] .grp .rate .nm, :root[data-theme="ios"] .grp .studio .nm { font-size: 14px; }
+:root[data-theme="ios"] .grp .field label { font-size: 12px; }
+:root[data-theme="ios"] .hint { font-size: 12px; }
+:root[data-theme="ios"] .row .chip { font-size: 13px; padding: 8px 16px; }
+:root[data-theme="ios"] .fld input[type=number] { padding-right: 32px; }
+:root[data-theme="ios"] .fld input[type=time] { padding-right: 12px; }
+:root[data-theme="ios"] .fld .suf { right: 12px; }
+:root[data-theme="ios"] .studio .fld { width: 100px; }
+:root[data-theme="ios"] #notifyMsg { flex-basis: 100%; text-align: center; padding: 0; }
