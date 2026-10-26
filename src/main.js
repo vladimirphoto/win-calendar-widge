@@ -10,7 +10,6 @@ const os = require('os');
 const { spawn, execFile } = require('child_process');
 const EMBEDDED = require('./google-client');
 const { createUpdater } = require('./updater');
-const { pruneAdvance } = require('./advance');
 const UPDATE_CFG = require('./update-config');
 const Cloud = require('./cloud');
 
@@ -112,12 +111,6 @@ function writeSecret(value) {
     return true;
   } catch (e) { console.error('secret save failed', e); return false; }
 }
-// с новым месяцем аванс прошлых месяцев стирается
-function pruneAdvanceNow() {
-  const r = pruneAdvance(settings.advance);
-  if (r.changed) { settings.advance = r.map; return true; }
-  return false;
-}
 function loadSettings() {
   let raw = {};
   try { raw = JSON.parse(fs.readFileSync(settingsFile(), 'utf8')) || {}; } catch {}
@@ -129,7 +122,6 @@ function loadSettings() {
   if (!settings.advance || typeof settings.advance !== 'object' || Array.isArray(settings.advance)) settings.advance = {};
   // раньше аванс работал всегда: у кого он уже внесён, оставляем включённым
   if (typeof raw.advanceOn !== 'boolean') settings.advanceOn = Object.keys(settings.advance).length > 0;
-  pruneAdvanceNow();
   delete settings.scale; // убрано: размер виджета не настраивается
   delete settings.studioNames; // убрано: имя задаётся одним полем «Что считать сменой»
   if (!settings.dayPay || typeof settings.dayPay !== 'object' || Array.isArray(settings.dayPay)) settings.dayPay = {};
@@ -665,7 +657,7 @@ function updateSettings(patch) {
       if (/^\d{4}-(0[1-9]|1[0-2])\|(first|second)$/.test(k) && isFinite(n) && n > 0 && n <= 1e9) entries.push([k, n]);
     }
     entries.sort((a, b) => (a[0] < b[0] ? 1 : -1)); // новые месяцы первыми
-    next.advance = Object.fromEntries(entries.slice(0, 120));
+    next.advance = Object.fromEntries(entries.slice(0, 600));
   }
   if (patch.dayPay && typeof patch.dayPay === 'object' && !Array.isArray(patch.dayPay)) {
     const entries = [];
@@ -674,7 +666,7 @@ function updateSettings(patch) {
       if (/^\d{4}-\d{2}-\d{2}\|(#[0-9a-f]{3,8}|none)$/i.test(k) && isFinite(n) && n >= 0 && n <= 1e9) entries.push([k.toLowerCase(), n]);
     }
     entries.sort((a, b) => (a[0] < b[0] ? 1 : -1)); // новые даты первыми
-    next.dayPay = Object.fromEntries(entries.slice(0, 1500));
+    next.dayPay = Object.fromEntries(entries.slice(0, 20000));
   }
   if (!applyingRemote && !Cloud.same(Cloud.pick(settings), Cloud.pick(next))) { next.cloudAt = Date.now(); next.cloudDirty = true; scheduleCloudPush(); }
   settings = next;
@@ -905,8 +897,6 @@ if (!app.requestSingleInstanceLock()) {
     // проверка обновлений: через 20 секунд после старта и затем каждые 6 часов
     setTimeout(() => checkForUpdates({ auto: true }), 20 * 1000);
     setInterval(() => checkForUpdates({ auto: true }), 6 * 3600 * 1000);
-    const advanceTick = () => { if (pruneAdvanceNow()) { saveSettings(); send('settings:changed', publicSettings()); } };
-    setInterval(advanceTick, 15 * 60 * 1000);
     // сюрприз в день выплаты (1 и 15) в выбранное время: окно появляется само, даже если оно было скрыто в трее
     const paydayTick = () => {
       if (settings.surprise === false || !win || win.isDestroyed()) return;
@@ -922,7 +912,7 @@ if (!app.requestSingleInstanceLock()) {
     };
     setInterval(paydayTick, 30 * 1000);
     setTimeout(paydayTick, 5000);
-    powerMonitor.on('resume', () => { setTimeout(() => send('app:refresh'), 4000); setTimeout(syncCloud, 6000); advanceTick(); });
+    powerMonitor.on('resume', () => { setTimeout(() => send('app:refresh'), 4000); setTimeout(syncCloud, 6000); });
     powerMonitor.on('unlock-screen', () => send('app:refresh'));
   });
 
