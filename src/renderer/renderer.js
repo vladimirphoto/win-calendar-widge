@@ -438,15 +438,15 @@ function applyAccent(hex) {
 
 /* тема: «Светлая» / «Тёмная» / «Стекло»; пока человек не выбрал, следуем теме Windows */
 const darkMQ = window.matchMedia('(prefers-color-scheme: dark)');
-const THEME_POS = { light: 0, dark: 1, glass: 2, ios: 3 };
+const THEME_POS = { light: 0, dark: 1, glass: 2 };
 function effectiveTheme(s) {
   const t = s?.theme;
-  return t === 'light' || t === 'dark' || t === 'glass' || t === 'ios' ? t : (darkMQ.matches ? 'dark' : 'light');
+  return t === 'light' || t === 'dark' || t === 'glass' ? t : t === 'ios' ? 'glass' : (darkMQ.matches ? 'dark' : 'light');
 }
 function applyTheme(s) {
   const t = effectiveTheme(s);
   document.documentElement.dataset.theme = t;
-  const glassy = t === 'glass' || t === 'ios'; // обе используют размытые обои
+  const glassy = t === 'glass';
   $('glassField').hidden = !glassy;
   $('opacityField').hidden = glassy; // в «Стекле» вместо обычной прозрачности свой ползунок
   if (glassy) refreshGlass(); else $('glassbg').hidden = true;
@@ -473,7 +473,7 @@ async function refreshGlass() {
 }
 function layoutGlass() {
   const root = $('glassbg'), gw = $('gw');
-  if (!['glass', 'ios'].includes(effectiveTheme(settings)) || !glass?.wall || !glass.disp || !glass.win) { root.hidden = true; return; }
+  if (effectiveTheme(settings) !== 'glass' || !glass?.wall || !glass.disp || !glass.win) { root.hidden = true; return; }
   const { wall, disp, win: wp } = glass;
   const iw = wall.w, ih = wall.h, dw = disp.width, dh = disp.height;
   let bw = dw, bh = dh;
@@ -493,7 +493,7 @@ api.onGlassGeometry(g => {
   cancelAnimationFrame(glassRaf);
   glassRaf = requestAnimationFrame(layoutGlass);
 });
-setInterval(() => { if (['glass', 'ios'].includes(effectiveTheme(settings)) && !document.hidden) refreshGlass(); }, 5 * 60 * 1000); // обои могли смениться
+setInterval(() => { if (effectiveTheme(settings) === 'glass' && !document.hidden) refreshGlass(); }, 5 * 60 * 1000); // обои могли смениться
 
 function renderPaySeg() {
   const seg = $('paySeg'), p = payPeriod();

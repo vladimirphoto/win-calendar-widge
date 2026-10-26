@@ -49,7 +49,7 @@ const DEFAULTS = {
   advanceOn: false, // учитывать аванс (вычитать из заработка)
   advance: {},     // аванс по половинам месяца: { '2026-10|first': 50000, '2026-10|second': 30000 }, вычитается из заработка
   payPeriod: 'month', // за какой период показывать заработок: 'month' весь месяц | 'first' 1–15 | 'second' 16–конец
-  theme: 'system', // 'system' | 'light' | 'dark' | 'glass' | 'ios'
+  theme: 'system', // 'system' | 'light' | 'dark' | 'glass'
   glassBlur: 20,   // размытие обоев под «Стеклом», px
   cloudAt: 0,      // когда личные данные менялись в последний раз (для облака)
   cloudAcct: '',   // чьи это данные (Google-аккаунт), чтобы данные одного сотрудника не попали к другому
@@ -541,7 +541,7 @@ function createWindow() {
 
   let moveTimer;
   win.on('move', () => {
-    if (settings.theme === 'glass' || settings.theme === 'ios') send('glass:geometry', glassGeometry());
+    if (settings.theme === 'glass') send('glass:geometry', glassGeometry());
     clearTimeout(moveTimer);
     moveTimer = setTimeout(() => {
       if (!win || win.isDestroyed()) return;
@@ -635,7 +635,7 @@ function updateSettings(patch) {
   if (typeof patch.notifyHours === 'number' && isFinite(patch.notifyHours)) {
     next.notifyHours = Math.min(48, Math.max(1, Math.round(patch.notifyHours)));
   }
-  if (['system', 'light', 'dark', 'glass', 'ios'].includes(patch.theme)) next.theme = patch.theme;
+  if (['system', 'light', 'dark', 'glass'].includes(patch.theme)) next.theme = patch.theme;
   if (['month', 'first', 'second'].includes(patch.payPeriod)) next.payPeriod = patch.payPeriod;
   if (typeof patch.goal === 'number' && isFinite(patch.goal)) next.goal = Math.min(1e9, Math.max(0, Math.round(patch.goal)));
   if (typeof patch.surpriseTime === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(patch.surpriseTime)) { next.surpriseTime = patch.surpriseTime; next.fxDay = ''; }

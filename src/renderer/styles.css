@@ -53,8 +53,8 @@
   --line: rgba(255, 255, 255, .17);
   --hover: rgba(255, 255, 255, .15);
   --press: rgba(255, 255, 255, .09);
-  --shift: #82ead8;
-  --shift-bg: rgba(130, 234, 216, .22);
+  --shift: #32d74b;
+  --shift-bg: rgba(50, 215, 75, .22);
 }
 
 * { box-sizing: border-box; margin: 0; }
@@ -313,9 +313,9 @@ input[type=time]::-webkit-calendar-picker-indicator { filter: invert(.6); cursor
   mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
 }
 :root[data-theme="glass"] .panel { background: rgba(18, 22, 34, .92); border-radius: inherit; }
-:root[data-theme="glass"] .day, :root[data-theme="ios"] .day { border-radius: 12px; }
+:root[data-theme="glass"] .day { border-radius: 12px; }
 :root[data-theme="glass"] .ev { border-radius: 12px; border-color: rgba(255, 255, 255, .2); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .18); }
-:root[data-theme="glass"] .chip, :root[data-theme="ios"] #btnToday { border-radius: 10px; }
+:root[data-theme="glass"] .chip { border-radius: 10px; }
 :root[data-theme="glass"] .panel .chip:not(.primary), :root[data-theme="glass"] #btnToday { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .25); }
 :root[data-theme="glass"] input[type=text], :root[data-theme="glass"] input[type=password],
 :root[data-theme="glass"] input[type=number], :root[data-theme="glass"] input[type=time] { border-radius: 10px; border-color: rgba(255, 255, 255, .2); border-bottom-color: rgba(255, 255, 255, .45); background: rgba(255, 255, 255, .1); }
@@ -329,7 +329,7 @@ input[type=time]::-webkit-calendar-picker-indicator { filter: invert(.6); cursor
   :root[data-theme="glass"] .card { background: rgba(24, 28, 40, .94); }
 }
 
-:root[data-theme="glass"] .day.today, :root[data-theme="ios"] .day.today { color: #fff; }
+:root[data-theme="glass"] .day.today { color: #fff; }
 :root[data-theme="glass"] ::placeholder { color: rgba(255, 255, 255, .42); }
 .field[hidden] { display: none; }
 
@@ -348,39 +348,10 @@ input[type=time]::-webkit-calendar-picker-indicator { filter: invert(.6); cursor
 
 /* под последним переключателем линия уже есть у заголовка следующего раздела: вторую не рисуем */
 
-/* ======================================================================
-   Тема «iOS 27» (Liquid Glass): капсулы, круглые дни, зелёные переключатели,
-   группы-карточки в настройках. Использует те же размытые обои, что и «Стекло».
-   ====================================================================== */
 .grp { display: contents; }
-.seg4 { grid-template-columns: repeat(4, 1fr); }
-.seg4 .thumb { width: calc((100% - 4px) / 4); }
-.seg4[data-pos="1"] .thumb { transform: translateX(100%); }
-.seg4[data-pos="2"] .thumb { transform: translateX(200%); }
-.seg4[data-pos="3"] .thumb { transform: translateX(300%); }
-.seg4 button { padding: 4px 8px; display: grid; place-items: center; }
-.seg4 button svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 
-:root[data-theme="ios"] {
-  --accent: #0a84ff !important;
-  --on-accent: #fff !important;
-  --bg: transparent;
-  --panel-bg: transparent;
-  --layer: rgba(255, 255, 255, .12);
-  --text: #fff;
-  --muted: rgba(235, 235, 245, .62);
-  --line: rgba(255, 255, 255, .14);
-  --hover: rgba(255, 255, 255, .16);
-  --press: rgba(255, 255, 255, .1);
-  --shift: #32d74b;
-  --shift-bg: rgba(50, 215, 75, .22);
-  --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
-  --font-display: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
-}
-:root[data-theme="ios"] body { letter-spacing: -.003em; }
-
-/* карточка: тонкое стекло, блик сверху, тёмная кромка снаружи и светлая внутри */
-:root[data-theme="ios"] .card {
+/* «Стекло»: главная страница в стиле iOS 27 (тонкое стекло, карточки панелей и событий, капсула «Мои/Все»); настройки остаются простыми */
+:root[data-theme="glass"] .card {
   isolation: isolate;
   background:
     radial-gradient(120% 70% at 12% -10%, rgba(255, 255, 255, .30), rgba(255, 255, 255, 0) 55%),
@@ -392,128 +363,28 @@ input[type=time]::-webkit-calendar-picker-indicator { filter: invert(.6); cursor
   box-shadow: 0 3px 12px rgba(0, 0, 0, .28), 0 1px 3px rgba(0, 0, 0, .18),
     inset 0 1.5px 0 rgba(255, 255, 255, .55), inset 0 -1px 0 rgba(255, 255, 255, .16), inset 1px 0 0 rgba(255, 255, 255, .14), inset -1px 0 0 rgba(255, 255, 255, .1);
 }
-:root[data-theme="ios"] .glassbg { display: block; position: absolute; inset: 0; z-index: -1; overflow: hidden; border-radius: inherit; pointer-events: none; }
-:root[data-theme="ios"] .glassbg[hidden] { display: none; }
-:root[data-theme="ios"] .gw { filter: blur(var(--glass-blur, 20px)) saturate(var(--glass-sat, 1.8)) brightness(1.04); }
-/* светлый внутренний ободок с преломлением у края */
-:root[data-theme="ios"] .card::after {
+:root[data-theme="glass"] .gw { filter: blur(var(--glass-blur, 20px)) saturate(var(--glass-sat, 1.8)) brightness(1.04); }
+:root[data-theme="glass"] .card::after {
   content: ""; position: absolute; inset: 1px; border-radius: 37px; padding: 1.5px; pointer-events: none; z-index: 6;
   background: linear-gradient(145deg, rgba(255, 255, 255, .9), rgba(255, 255, 255, .06) 30%, rgba(255, 255, 255, 0) 55%, rgba(255, 255, 255, .06) 72%, rgba(255, 255, 255, .55));
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor;
   mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
 }
-:root[data-theme="ios"] .grip i { background: #fff; opacity: .4; width: 36px; height: 5px; border-radius: 3px; }
-
-/* шапка: крупный заголовок, стеклянные круглые кнопки */
-:root[data-theme="ios"] .panel .chip {
-  border-radius: 999px; font-weight: 600; font-size: 13px; padding: 6px 12px; border: 0;
-  background: rgba(255, 255, 255, .16);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .45), inset 0 -1px 0 rgba(255, 255, 255, .08), 0 1px 3px rgba(0, 0, 0, .2);
-  transition: background .15s;
-}
-:root[data-theme="ios"] .panel .chip:hover { background: rgba(255, 255, 255, .26); }
-:root[data-theme="ios"] .panel .chip:active { background: rgba(255, 255, 255, .32); }
-:root[data-theme="ios"] .panel .chip.primary { background: #0a84ff; color: #fff; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .4), 0 2px 8px rgba(10, 132, 255, .4); }
-:root[data-theme="ios"] .panel .chip.primary:hover { background: #3b9dff; filter: none; }
-:root[data-theme="ios"] .panel .chip:not(.primary):hover { background: rgba(255, 255, 255, .26); border: 0; }
-
-/* дни недели и круглые дни */
-
-/* панели под сеткой и список дня */
-:root[data-theme="ios"] .ins { border-top: 0; padding-top: 4px; margin-top: 6px; }
-:root[data-theme="ios"] .ins > div { background: rgba(255, 255, 255, .1); border-radius: 20px; padding: 12px 14px; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .22); }
-:root[data-theme="ios"] .gbar { height: 8px; border-radius: 4px; background: rgba(255, 255, 255, .16); }
-:root[data-theme="ios"] .gbar i { border-radius: 4px; }
-:root[data-theme="ios"] .agenda { border-top: 0; padding-top: 6px; margin-top: 8px; }
-:root[data-theme="ios"] .agenda h3 { font-size: 15px; font-weight: 700; }
-:root[data-theme="ios"] .earn { font-weight: 700; }
-:root[data-theme="ios"] .ev { border: 0; border-radius: 20px; background: rgba(255, 255, 255, .12); padding: 10px 12px 10px 0; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .28); }
-:root[data-theme="ios"] .ev .bar { border-radius: 3px; margin: 2px 0 2px 12px; width: 4px; }
-:root[data-theme="ios"] .ev .tag { border-radius: 999px; }
-:root[data-theme="ios"] .empty { color: var(--muted); }
-:root[data-theme="ios"] input[type=text], :root[data-theme="ios"] input[type=password], :root[data-theme="ios"] input[type=number], :root[data-theme="ios"] input[type=time] {
-  border: 0; border-radius: 12px; background: rgba(255, 255, 255, .14); padding: 8px 12px; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .15);
-}
-:root[data-theme="ios"] input:focus { box-shadow: 0 0 0 2px rgba(10, 132, 255, .8); outline: none; }
-:root[data-theme="ios"] ::placeholder { color: rgba(235, 235, 245, .38); }
-
-/* подвал и переключатель: стеклянная капсула, активный сегмент светлее */
-:root[data-theme="ios"] .seg { border: 0; border-radius: 999px; padding: 3px; background: rgba(255, 255, 255, .13); box-shadow: inset 0 1px 2px rgba(0, 0, 0, .25), inset 0 -1px 0 rgba(255, 255, 255, .1); }
-:root[data-theme="ios"] .seg .thumb { top: 3px; bottom: 3px; left: 3px; width: calc((100% - 6px) / 2); border-radius: 999px; background: rgba(255, 255, 255, .34); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .65), 0 2px 8px rgba(0, 0, 0, .3); transition: transform .4s cubic-bezier(.32, 1.2, .4, 1); }
-:root[data-theme="ios"] .seg3 .thumb { width: calc((100% - 6px) / 3); }
-:root[data-theme="ios"] .seg4 .thumb { width: calc((100% - 6px) / 4); }
-:root[data-theme="ios"] .seg button { border-radius: 999px; font-weight: 600; font-size: 13px; padding: 5px 16px; color: var(--muted); }
-:root[data-theme="ios"] .seg button.on { color: #fff; }
-:root[data-theme="ios"] .seg3 button { padding: 5px 9px; }
-:root[data-theme="ios"] .seg4 button { padding: 5px 7px; }
-:root[data-theme="ios"] .seg4 button svg { width: 15px; height: 15px; }
-:root[data-theme="ios"] .panel-actions { gap: 8px; }
-:root[data-theme="ios"] .seg-txt button { padding: 6px 8px; }
-:root[data-theme="ios"] .seg.noanim .thumb { transition: none; }
-:root[data-theme="ios"] .status { font-size: 12px; }
-
-/* настройки: большой заголовок и группы-карточки */
-:root[data-theme="ios"] .panel { background: linear-gradient(180deg, rgba(30, 32, 42, .985), rgba(22, 24, 34, .99)); border-radius: inherit; padding: 0 16px 18px; }
-:root[data-theme="ios"] .panel::before { margin: 0 -16px 2px; background: rgb(30, 32, 42); }
-:root[data-theme="ios"] .panel h2 { font-size: 25px; font-weight: 700; letter-spacing: -.02em; }
-:root[data-theme="ios"] .panel-head { margin-bottom: 14px; }
-:root[data-theme="ios"] .sect { border: 0; padding: 0 16px; margin: 24px 0 8px; font-size: 13px; font-weight: 500; text-transform: uppercase; letter-spacing: .03em; color: var(--muted); }
-:root[data-theme="ios"] .grp { display: block; margin-top: 14px; padding: 0 16px; border-radius: 22px; background: rgba(255, 255, 255, .1); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .2); }
-:root[data-theme="ios"] .sect + .grp { margin-top: 0; }
-:root[data-theme="ios"] .grp > :not([hidden]) ~ :not([hidden]) { border-top: 1px solid rgba(255, 255, 255, .12); }
-:root[data-theme="ios"] .grp .toggle { padding: 12px 0; font-size: 16px; }
-:root[data-theme="ios"] .grp .rate { margin-top: 0; padding: 8px 0; min-height: 46px; }
-:root[data-theme="ios"] .grp .rate .nm, :root[data-theme="ios"] .grp .studio .nm { font-size: 16px; }
-:root[data-theme="ios"] .grp .field { margin-top: 0; padding: 11px 0; }
-:root[data-theme="ios"] .grp .field label { font-size: 13px; color: var(--muted); margin-bottom: 6px; }
-:root[data-theme="ios"] .grp .field .hint { margin-top: 8px; }
-:root[data-theme="ios"] .grp input[type=text], :root[data-theme="ios"] .grp input[type=number], :root[data-theme="ios"] .grp input[type=time] { background: rgba(255, 255, 255, .1); }
-:root[data-theme="ios"] .grp .studio { padding: 9px 0; }
-:root[data-theme="ios"] .grp #rates { margin: 0; }
-:root[data-theme="ios"] .hint { font-size: 13px; padding: 0 16px; margin-top: 8px; color: var(--muted); }
-:root[data-theme="ios"] .grp .hint { padding: 0; }
-:root[data-theme="ios"] .err { padding: 0 16px; }
-:root[data-theme="ios"] .row { justify-content: center; flex-wrap: wrap; margin-top: 14px; }
-:root[data-theme="ios"] .row .chip { padding: 9px 18px; font-size: 15px; }
-:root[data-theme="ios"] .chip.danger { color: #ff453a; background: rgba(255, 69, 58, .14); border: 0; }
-:root[data-theme="ios"] .chip.danger:hover { background: rgba(255, 69, 58, .26); }
-:root[data-theme="ios"] .chip.danger.solid { background: #ff453a; color: #fff; }
-:root[data-theme="ios"] .confirm { border: 0; border-radius: 22px; background: rgba(255, 69, 58, .12); padding: 14px 16px; }
-
-/* переключатель iOS: 51×31, зелёный, белая ручка с тенью */
-:root[data-theme="ios"] .sw { width: 51px; height: 31px; }
-:root[data-theme="ios"] .sw b { border: 0; border-radius: 16px; background: rgba(120, 120, 128, .4); box-shadow: inset 0 1px 2px rgba(0, 0, 0, .25); transition: background .25s; }
-:root[data-theme="ios"] .sw b::after { top: 2px; left: 2px; width: 27px; height: 27px; background: #fff; box-shadow: 0 3px 8px rgba(0, 0, 0, .3), 0 1px 1px rgba(0, 0, 0, .16); transition: transform .3s cubic-bezier(.32, 1.2, .4, 1), width .2s; }
-:root[data-theme="ios"] .sw input:checked + b { background: #34c759; border: 0; box-shadow: inset 0 1px 2px rgba(0, 0, 0, .15); }
-:root[data-theme="ios"] .sw input:checked + b::after { background: #fff; transform: translateX(20px); }
-:root[data-theme="ios"] .sw input:active + b::after { width: 33px; }
-:root[data-theme="ios"] .sw input:checked:active + b::after { transform: translateX(14px); }
-
-/* ползунки iOS: тонкая дорожка и белый круг */
-:root[data-theme="ios"] input[type=range] { -webkit-appearance: none; appearance: none; height: 28px; background: none; padding: 0; box-shadow: none; }
-:root[data-theme="ios"] input[type=range]::-webkit-slider-runnable-track { height: 6px; border-radius: 3px; background: rgba(255, 255, 255, .28); }
-:root[data-theme="ios"] input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 28px; height: 28px; margin-top: -11px; border-radius: 50%; background: #fff; box-shadow: 0 2px 8px rgba(0, 0, 0, .35), 0 0 0 .5px rgba(0, 0, 0, .06); }
-
-/* полосы прокрутки: как в iOS, тонкая светлая линия */
-:root[data-theme="ios"] ::-webkit-scrollbar { width: 8px; }
-:root[data-theme="ios"] ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, .38); border: 2px solid transparent; background-clip: padding-box; border-radius: 4px; }
-:root[data-theme="ios"] ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, .55); background-clip: padding-box; }
-@media (prefers-reduced-transparency: reduce) {
-  :root[data-theme="ios"] .glassbg { display: none; }
-  :root[data-theme="ios"] .card { background: rgba(28, 30, 40, .94); }
-}
-
-/* iOS: размеры текста в настройках меньше, сумма не налезает на единицу, кнопка «Проверить» стоит на месте по центру */
-:root[data-theme="ios"] .panel h2 { font-size: 20px; }
-:root[data-theme="ios"] .sect { font-size: 11.5px; margin: 20px 16px 6px; }
-:root[data-theme="ios"] .grp .toggle { font-size: 14px; padding: 10px 0; }
-:root[data-theme="ios"] .grp .rate { min-height: 42px; }
-:root[data-theme="ios"] .grp .rate .nm, :root[data-theme="ios"] .grp .studio .nm { font-size: 14px; }
-:root[data-theme="ios"] .grp .field label { font-size: 12px; }
-:root[data-theme="ios"] .hint { font-size: 12px; }
-:root[data-theme="ios"] .row .chip { font-size: 13px; padding: 8px 16px; }
-:root[data-theme="ios"] .fld input[type=number] { padding-right: 32px; }
-:root[data-theme="ios"] .fld input[type=time] { padding-right: 12px; }
-:root[data-theme="ios"] .fld .suf { right: 12px; }
-:root[data-theme="ios"] .studio .fld { width: 100px; }
-:root[data-theme="ios"] #notifyMsg { flex-basis: 100%; text-align: center; padding: 0; }
+:root[data-theme="glass"] .grip i { background: #fff; opacity: .4; width: 36px; height: 5px; border-radius: 3px; }
+:root[data-theme="glass"] .ins { border-top: 0; padding-top: 4px; margin-top: 6px; }
+:root[data-theme="glass"] .ins > div { background: rgba(255, 255, 255, .1); border-radius: 20px; padding: 12px 14px; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .22); }
+:root[data-theme="glass"] .gbar { height: 8px; border-radius: 4px; background: rgba(255, 255, 255, .16); }
+:root[data-theme="glass"] .gbar i { border-radius: 4px; }
+:root[data-theme="glass"] .agenda { border-top: 0; padding-top: 6px; margin-top: 8px; }
+:root[data-theme="glass"] .agenda h3 { font-size: 15px; font-weight: 700; }
+:root[data-theme="glass"] .earn { font-weight: 700; }
+:root[data-theme="glass"] .ev { border: 0; border-radius: 20px; background: rgba(255, 255, 255, .12); padding: 10px 12px 10px 0; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .28); }
+:root[data-theme="glass"] .ev .bar { border-radius: 3px; margin: 2px 0 2px 12px; width: 4px; }
+:root[data-theme="glass"] .ev .tag { border-radius: 999px; }
+:root[data-theme="glass"] .empty { color: var(--muted); }
+:root[data-theme="glass"] .status { font-size: 12px; }
+:root[data-theme="glass"] #seg { border: 0; border-radius: 999px; padding: 3px; background: rgba(255, 255, 255, .13); box-shadow: inset 0 1px 2px rgba(0, 0, 0, .25), inset 0 -1px 0 rgba(255, 255, 255, .1); }
+:root[data-theme="glass"] #seg .thumb { top: 3px; bottom: 3px; left: 3px; width: calc((100% - 6px) / 2); border-radius: 999px; background: rgba(255, 255, 255, .34); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .65), 0 2px 8px rgba(0, 0, 0, .3); transition: transform .4s cubic-bezier(.32, 1.2, .4, 1); }
+:root[data-theme="glass"] #seg.noanim .thumb { transition: none; }
+:root[data-theme="glass"] #seg button { border-radius: 999px; font-weight: 600; font-size: 13px; padding: 5px 16px; }
+:root[data-theme="glass"] .ev .pay input[type=number] { border-radius: 10px; }
