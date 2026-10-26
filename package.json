@@ -8,7 +8,7 @@
   "scripts": {
     "icon": "node build/gen-icon.js",
     "start": "npm run icon && electron .",
-    "dist": "npm run icon && electron-builder --win portable --x64",
+    "dist": "npm run icon && electron-builder --win portable nsis --x64",
     "dist:mac": "npm run icon && electron-builder --mac dir --arm64"
   },
   "devDependencies": {
@@ -16,15 +16,16 @@
     "electron-builder": "^25.1.8"
   },
   "build": {
-    "appId": "local.win.calendar.widget",
+    "appId": "CalendarWidget",
     "productName": "CalendarWidget",
     "files": ["src/**/*", "build/icon.png", "package.json"],
     "directories": { "output": "dist" },
     "win": {
-      "target": [{ "target": "portable", "arch": ["x64"] }],
+      "target": [{ "target": "portable", "arch": ["x64"] }, { "target": "nsis", "arch": ["x64"] }],
       "icon": "build/icon.png"
     },
     "mac": {
+      "appId": "local.win.calendar.widget",
       "target": [{ "target": "dir", "arch": ["arm64"] }],
       "icon": "build/icon.png",
       "category": "public.app-category.productivity",
@@ -33,6 +34,17 @@
     },
     "portable": {
       "artifactName": "CalendarWidget.exe"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Календарь-виджет",
+      "uninstallDisplayName": "Календарь-виджет",
+      "runAfterFinish": true,
+      "deleteAppDataOnUninstall": false,
+      "artifactName": "CalendarWidget-Setup.exe"
     }
   }
 }

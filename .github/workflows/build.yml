@@ -25,12 +25,16 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: CalendarWidget
-          path: dist/CalendarWidget.exe
+          path: |
+            dist/CalendarWidget.exe
+            dist/CalendarWidget-Setup.exe
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: latest
           name: CalendarWidget 1.0.${{ github.run_number }}
-          files: dist/CalendarWidget.exe
+          files: |
+            dist/CalendarWidget.exe
+            dist/CalendarWidget-Setup.exe
 
   mac:
     # Mac на Apple Silicon (M1 и новее); архив добавляется в тот же релиз latest рядом с exe

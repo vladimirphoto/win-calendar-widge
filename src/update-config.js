@@ -3,5 +3,6 @@
 module.exports = {
   repo: 'vladimirphoto/win-calendar-widge',
   tag: 'latest',
-  asset: 'CalendarWidget.exe'
+  asset: 'CalendarWidget.exe',            // portable-версия
+  installerAsset: 'CalendarWidget-Setup.exe' // установленная версия
 };

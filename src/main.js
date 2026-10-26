@@ -423,8 +423,10 @@ function showNote(title, body) {
 const updater = createUpdater({
   config: UPDATE_CFG,
   getVersion: () => app.getVersion(),
-  // самообновление возможно только у собранного portable-exe
+  // самообновление: portable-exe или установленная версия
   getExePath: () => (app.isPackaged && /\.exe$/i.test(process.env.PORTABLE_EXECUTABLE_FILE || '') ? process.env.PORTABLE_EXECUTABLE_FILE : ''),
+  // установленная через Setup.exe версия обновляется запуском нового установщика
+  getInstalled: () => app.isPackaged && process.platform === 'win32' && !process.env.PORTABLE_EXECUTABLE_FILE,
   send: st => send('update:state', st),
   onQuit: () => { quitting = true; setTimeout(() => app.exit(0), 300); }
 });
@@ -523,7 +525,7 @@ function createWindow() {
     maximizable: false,
     minimizable: false,
     fullscreenable: false,
-    skipTaskbar: true,
+    skipTaskbar: false, // значок на панели задач есть, пока окно показано; при скрытии в трей исчезает
     show: false,
     alwaysOnTop: settings.alwaysOnTop,
     icon: iconPath,

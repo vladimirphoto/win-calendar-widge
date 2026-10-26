@@ -1,5 +1,5 @@
 'use strict';
-// Самообновление portable-exe из GitHub Releases.
+// Самообновление из GitHub Releases: portable-exe (подмена файла) или установленная версия (тихий запуск установщика).
 // Схема: проверить версию -> скачать рядом с exe -> проверить размер/sha256/заголовок ->
 // закрыться; внешний bat-скрипт дожидается выхода, подменяет файл и запускает новую версию.
 const fs = require('fs');
@@ -34,13 +34,13 @@ function buildSwapScript(newFile, target) {
 }
 
 function createUpdater(deps) {
-  const { config, getVersion, getExePath, send, fetchFn = fetch, onQuit, spawnFn = spawn } = deps;
+  const { config, getVersion, getExePath, getInstalled = () => false, send, fetchFn = fetch, onQuit, spawnFn = spawn } = deps;
   let state = { state: 'idle', current: getVersion() };
   let busy = false;
   let found = null; // { version, asset }
 
   const set = patch => { state = { ...state, ...patch, current: getVersion() }; send(state); return state; };
-  const supported = () => !!getExePath();
+  const supported = () => !!getExePath() || !!getInstalled();
 
   async function check() {
     if (busy) return state;
@@ -60,7 +60,7 @@ function createUpdater(deps) {
       if (!r.ok) return set({ state: 'error', code: 'HTTP', message: 'Ошибка GitHub: HTTP ' + r.status });
       const rel = await r.json();
       const latest = parseVersion(rel.name) || parseVersion(rel.body);
-      const asset = (rel.assets || []).find(a => a.name === config.asset && a.state === 'uploaded');
+      const asset = (rel.assets || []).find(a => a.name === (getExePath() ? config.asset : config.installerAsset) && a.state === 'uploaded');
       if (!latest || !asset) return set({ state: 'error', code: 'BAD_RELEASE', message: 'В релизе нет версии или файла exe' });
       const cur = parseVersion(getVersion()) || [0, 0, 0];
       if (cmpVersion(latest, cur) <= 0) { found = null; return set({ state: 'uptodate', latest: latest.join('.'), message: '' }); }
@@ -73,10 +73,11 @@ function createUpdater(deps) {
     if (busy) return state;
     if (!found) return set({ state: 'error', code: 'NONE', message: 'Сначала проверьте обновления' });
     const target = getExePath();
-    if (!target) return set({ state: 'unsupported', message: process.platform === 'darwin' ? 'На Mac обновляйте вручную: скачайте новый архив из Releases' : 'Автообновление работает только в собранном exe' });
+    const installer = !target && !!getInstalled();
+    if (!target && !installer) return set({ state: 'unsupported', message: process.platform === 'darwin' ? 'На Mac обновляйте вручную: скачайте новый архив из Releases' : 'Автообновление работает только в собранном exe' });
     busy = true;
     const { asset, version } = found;
-    const tmp = path.join(path.dirname(target), 'CalendarWidget.update.exe');
+    const tmp = installer ? path.join(os.tmpdir(), 'CalendarWidget-Setup-update.exe') : path.join(path.dirname(target), 'CalendarWidget.update.exe');
     try {
       set({ state: 'downloading', latest: version, progress: 0, message: '' });
       let r;
@@ -113,11 +114,16 @@ function createUpdater(deps) {
       if (want && hash.digest('hex') !== want[1].toLowerCase()) return bad('Контрольная сумма не совпала, обновление отменено');
 
       set({ state: 'installing', message: 'Перезапуск…' });
-      const bat = path.join(os.tmpdir(), 'calendar-widget-update-' + process.pid + '.bat');
-      fs.writeFileSync(bat, buildSwapScript(tmp, target));
       const env = { ...process.env };
       for (const k of Object.keys(env)) if (/^PORTABLE_EXECUTABLE/i.test(k)) delete env[k];
-      spawnFn('cmd.exe', ['/c', bat], { detached: true, stdio: 'ignore', windowsHide: true, env }).unref();
+      if (installer) {
+        // установленная версия: тихая установка поверх (сама закроет виджет) и запуск новой версии
+        spawnFn(tmp, ['/S', '--force-run'], { detached: true, stdio: 'ignore', windowsHide: true, env }).unref();
+      } else {
+        const bat = path.join(os.tmpdir(), 'calendar-widget-update-' + process.pid + '.bat');
+        fs.writeFileSync(bat, buildSwapScript(tmp, target));
+        spawnFn('cmd.exe', ['/c', bat], { detached: true, stdio: 'ignore', windowsHide: true, env }).unref();
+      }
       onQuit();
       return state;
     } finally { busy = false; }
