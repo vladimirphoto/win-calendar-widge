@@ -56,7 +56,7 @@
     <div class="panel-head">
       <h2>Настройки</h2>
       <div class="panel-actions">
-        <div class="seg seg3" id="themeSeg" data-pos="1" role="group" aria-label="Тема оформления">
+        <div class="seg seg4" id="themeSeg" data-pos="1" role="group" aria-label="Тема оформления">
           <i class="thumb" aria-hidden="true"></i>
           <button type="button" data-theme="light" title="Светлая тема" aria-label="Светлая тема">
             <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
@@ -67,6 +67,9 @@
           <button type="button" data-theme="glass" title="Стекло" aria-label="Стеклянная тема">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3c3.2 4.1 6 7.2 6 10.8a6 6 0 0 1-12 0C6 10.2 8.8 7.1 12 3z"/><path d="M9.5 14.5a2.7 2.7 0 0 0 2 2.2"/></svg>
           </button>
+          <button type="button" data-theme="ios" title="iOS 27" aria-label="Тема iOS 27">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="17" rx="5.5"/><path d="M8 12.5l2.8 2.8L16.5 9"/></svg>
+          </button>
         </div>
         <button class="chip primary" id="btnDone">Готово</button>
       </div>
@@ -74,12 +77,15 @@
 
     <p class="err" id="cfgErr" hidden></p>
 
+    <div class="grp">
     <div class="field">
       <label for="fKeys">Что считать сменой</label>
       <input id="fKeys" type="text" placeholder="Ваше имя, как в названии смены" spellcheck="false">
       <p class="hint">Слова через запятую. Пока пусто, это обычный календарь без смен.</p>
     </div>
+    </div>
 
+    <div class="grp">
     <div class="field" id="opacityField">
       <label for="fOpacity">Прозрачность</label>
       <input id="fOpacity" type="range" min="40" max="100" step="2">
@@ -88,14 +94,18 @@
       <label for="fBlur">Размытие стекла</label>
       <input id="fBlur" type="range" min="0" max="40" step="1">
     </div>
+    </div>
 
+    <div class="grp">
     <div class="toggle"><span>Автозапуск с Windows</span><label class="sw"><input type="checkbox" id="tAuto"><b></b></label></div>
     <div class="toggle"><span>Только мои смены</span><label class="sw"><input type="checkbox" id="tOnly"><b></b></label></div>
     <div class="toggle"><span>Поверх всех окон</span><label class="sw"><input type="checkbox" id="tTop"><b></b></label></div>
     <div class="toggle"><span>Закрепить положение</span><label class="sw"><input type="checkbox" id="tLock"><b></b></label></div>
+    </div>
     <p class="hint" id="devNote" hidden>Автозапуск работает только в собранном exe.</p>
 
     <h3 class="sect">Заработок</h3>
+    <div class="grp">
     <div class="field">
       <label>Показывать за</label>
       <div class="seg seg3 seg-txt" id="paySeg" data-pos="0" role="group" aria-label="Период заработка">
@@ -106,14 +116,18 @@
       </div>
     </div>
     <div id="rates"></div>
+    </div>
     <p class="hint" id="ratesEmpty">Студии появятся после входа в Google.</p>
     <div class="row"><button class="chip" id="btnClearPay" type="button">Очистить заработок</button></div>
 
     <h3 class="sect">Аванс</h3>
+    <div class="grp">
     <div class="toggle"><span>Учитывать аванс</span><label class="sw"><input type="checkbox" id="tAdv"><b></b></label></div>
+    </div>
     <div id="advBox" hidden>
       <p class="hint">За месяц в календаре (<b id="advMonth"></b>). Вычитается из заработка, в новом месяце очищается.</p>
-      <div class="rate">
+      <div class="grp">
+    <div class="rate">
         <label class="nm" for="fAdvFirst">За 1–15</label>
         <span class="fld"><input id="fAdvFirst" type="number" min="0" max="1000000000" step="1000" inputmode="numeric" placeholder="0" data-half="first"><i class="suf">₸</i></span>
       </div>
@@ -121,10 +135,12 @@
         <label class="nm" for="fAdvSecond">За 16–конец</label>
         <span class="fld"><input id="fAdvSecond" type="number" min="0" max="1000000000" step="1000" inputmode="numeric" placeholder="0" data-half="second"><i class="suf">₸</i></span>
       </div>
+    </div>
       <div class="row"><button class="chip" id="btnClearAdv" type="button">Очистить аванс</button></div>
     </div>
 
     <h3 class="sect">Панели в календаре</h3>
+    <div class="grp">
     <div class="toggle"><span>Цель по заработку</span><label class="sw"><input type="checkbox" id="tGoal"><b></b></label></div>
     <div class="rate" id="rGoal" hidden>
       <label class="nm" for="fGoal">Цель на месяц</label>
@@ -141,8 +157,10 @@
       <label class="nm" for="fFunTime">В день зарплаты (1 и 15) в</label>
       <span class="fld"><input id="fFunTime" type="time"></span>
     </div>
+    </div>
 
     <h3 class="sect">Уведомления</h3>
+    <div class="grp">
     <div class="toggle"><span>Напоминать о смене</span><label class="sw"><input type="checkbox" id="tNotify"><b></b></label></div>
     <div class="rate">
       <label class="nm" for="fNotifyH">За сколько часов</label>
@@ -151,6 +169,7 @@
     <div class="rate">
       <label class="nm" for="fNotifyEve">Накануне (смены на весь день)</label>
       <span class="fld"><input id="fNotifyEve" type="time"></span>
+    </div>
     </div>
     <p class="hint" id="notifyWhen"></p>
     <div class="row"><button class="chip" id="btnNotifyTest" type="button">Проверить</button><span class="hint" id="notifyMsg" style="margin:0;align-self:center"></span></div>
@@ -164,7 +183,9 @@
     <p class="hint" id="cloudHint" hidden></p>
 
     <h3 class="sect">Обновления</h3>
+    <div class="grp">
     <div class="toggle"><span>Автообновление</span><label class="sw"><input type="checkbox" id="tAutoUpd" checked><b></b></label></div>
+    </div>
     <p class="hint" id="updText"></p>
     <div class="row"><button class="chip primary" id="btnUpd">Проверить</button></div>
 
